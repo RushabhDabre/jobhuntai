@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       requirements: partialJob.requirements || [],
       department: partialJob.department,
       status: 'discovered',
+      postedAt: now,
       createdAt: now,
       updatedAt: now,
     };

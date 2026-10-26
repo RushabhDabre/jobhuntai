@@ -45,6 +45,7 @@ export async function POST(req: Request) {
         description: raw.description || '',
         requirements: raw.requirements || [],
         status: 'discovered',
+        postedAt: now,
         createdAt: now,
         updatedAt: now,
       };

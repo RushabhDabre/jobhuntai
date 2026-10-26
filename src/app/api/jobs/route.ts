@@ -35,6 +35,7 @@ export async function POST(req: Request) {
           department: item.department,
           status: item.status || 'discovered',
           notes: item.notes || '',
+          postedAt: item.postedAt || now,
           createdAt: item.createdAt || now,
           updatedAt: now,
         };
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
       location: body.location || 'Remote',
       remoteType: body.remoteType || 'unknown',
       salary: body.salary,
+      salaryInLpa: body.salaryInLpa || body.salary,
       url: body.url || '',
       source: body.source || 'manual',
       description: body.description || '',
@@ -58,6 +60,7 @@ export async function POST(req: Request) {
       department: body.department,
       status: body.status || 'discovered',
       notes: body.notes || '',
+      postedAt: body.postedAt || now,
       createdAt: now,
       updatedAt: now,
     };

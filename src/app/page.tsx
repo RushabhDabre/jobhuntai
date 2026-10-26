@@ -9,19 +9,19 @@ import ProfileView from '@/components/ProfileView';
 import JobDetailModal from '@/components/JobDetailModal';
 import SettingsModal from '@/components/SettingsModal';
 import AddJobModal from '@/components/AddJobModal';
+import QuickStartModal from '@/components/QuickStartModal';
 import { Job, JobStatus, UserProfile } from '@/types/job';
-import { Search, Sparkles, Plus, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'feed' | 'pipeline' | 'harvester' | 'profile'>('feed');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [searchFilter, setSearchFilter] = useState('');
-  const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddJobOpen, setIsAddJobOpen] = useState(false);
+  const [isQuickSetupOpen, setIsQuickSetupOpen] = useState(false);
 
   // Fetch jobs and profile on mount
   const fetchData = async () => {
@@ -39,6 +39,10 @@ export default function Home() {
       const profileData = await profileRes.json();
       if (profileData.success && profileData.profile) {
         setProfile(profileData.profile);
+        // If user has not completed quick setup, open modal automatically
+        if (!profileData.profile.hasCompletedQuickSetup) {
+          setIsQuickSetupOpen(true);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -116,6 +120,23 @@ export default function Home() {
     });
   };
 
+  // Save partial profile updates from QuickStart modal
+  const handleSaveProfile = async (partialProfile: Partial<UserProfile>) => {
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partialProfile),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setProfile(data.profile);
+      }
+    } catch (err) {
+      console.error('Failed to save profile from quick setup:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
@@ -130,84 +151,21 @@ export default function Home() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        {/* Search & Filter Controls (Visible on Feed & Pipeline) */}
-        {(activeTab === 'feed' || activeTab === 'pipeline') && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search roles (e.g. SDE 2, Frontend), companies (Razorpay, Swiggy), or Indian cities..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-zinc-400"
-              />
-            </div>
-
-            {/* Score Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl text-xs font-semibold">
-                <button
-                  onClick={() => setMinScoreFilter(0)}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    minScoreFilter === 0
-                      ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  All Roles
-                </button>
-                <button
-                  onClick={() => setMinScoreFilter(90)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    minScoreFilter === 90
-                      ? 'bg-emerald-600 text-white shadow-xs font-bold'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span>90%+ Fit</span>
-                </button>
-                <button
-                  onClick={() => setMinScoreFilter(75)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    minScoreFilter === 75
-                      ? 'bg-blue-600 text-white shadow-xs font-bold'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  <span>75%+ Fit</span>
-                </button>
-              </div>
-
-              <button
-                onClick={() => setIsAddJobOpen(true)}
-                className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Add Role</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Tab Views */}
         {loading ? (
           <div className="py-24 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600" />
-            <p className="text-xs text-zinc-400 mt-2">Loading your job pipeline...</p>
+            <p className="text-xs text-zinc-400 mt-2">Loading active vacancies...</p>
           </div>
         ) : (
           <>
             {activeTab === 'feed' && (
               <SmartFeedView
                 jobs={jobs}
+                profile={profile}
                 onSelectJob={(job) => setSelectedJob(job)}
                 onUpdateStatus={handleUpdateStatus}
                 onDeleteJob={handleDeleteJob}
-                searchFilter={searchFilter}
-                minScoreFilter={minScoreFilter}
+                onOpenQuickSetup={() => setIsQuickSetupOpen(true)}
               />
             )}
 
@@ -216,8 +174,8 @@ export default function Home() {
                 jobs={jobs}
                 onSelectJob={(job) => setSelectedJob(job)}
                 onUpdateStatus={handleUpdateStatus}
-                searchFilter={searchFilter}
-                minScoreFilter={minScoreFilter}
+                searchFilter=""
+                minScoreFilter={0}
               />
             )}
 
@@ -234,6 +192,14 @@ export default function Home() {
       </main>
 
       {/* Modals */}
+      <QuickStartModal
+        isOpen={isQuickSetupOpen}
+        onClose={() => setIsQuickSetupOpen(false)}
+        profile={profile}
+        onSaveProfile={handleSaveProfile}
+        onTriggerSearch={() => setActiveTab('feed')}
+      />
+
       <JobDetailModal
         job={selectedJob}
         onClose={() => setSelectedJob(null)}
