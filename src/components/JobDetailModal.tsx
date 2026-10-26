@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Sparkles,
   ExternalLink,
   Building2,
   MapPin,
-  DollarSign,
+  IndianRupee,
   Copy,
   Check,
   Loader2,
@@ -17,6 +17,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Lightbulb,
+  Clock,
 } from 'lucide-react';
 import { Job, JobStatus, MatchAnalysis } from '@/types/job';
 
@@ -27,16 +28,33 @@ interface JobDetailModalProps {
 }
 
 export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [activeTab, setActiveTab] = useState<'match' | 'pitch' | 'description' | 'notes'>('match');
   const [evaluating, setEvaluating] = useState(false);
   const [generatingPitch, setGeneratingPitch] = useState(false);
-  const [pitchType, setPitchType] = useState<'cover_letter' | 'cold_email' | 'linkedin_dm'>('cover_letter');
-  const [pitchContent, setPitchContent] = useState(job?.coverLetter || job?.coldPitch || '');
+  const [pitchType, setPitchType] = useState<'linkedin_dm' | 'cold_email' | 'cover_letter'>('linkedin_dm');
+  const [pitchContent, setPitchContent] = useState('');
   const [copied, setCopied] = useState(false);
-  const [localNotes, setLocalNotes] = useState(job?.notes || '');
-  const [localStatus, setLocalStatus] = useState<JobStatus>(job?.status || 'discovered');
-  const [localAppliedDate, setLocalAppliedDate] = useState(job?.appliedDate || '');
+  const [localNotes, setLocalNotes] = useState('');
+  const [localStatus, setLocalStatus] = useState<JobStatus>('discovered');
+  const [localAppliedDate, setLocalAppliedDate] = useState('');
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
+
+  // Sync state on job change and handle native dialog showModal
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (job) {
+      setLocalNotes(job.notes || '');
+      setLocalStatus(job.status || 'discovered');
+      setLocalAppliedDate(job.appliedDate || '');
+      setPitchContent(job.coldPitch || job.coverLetter || '');
+      if (dialog && !dialog.open) {
+        dialog.showModal();
+      }
+    } else if (dialog && dialog.open) {
+      dialog.close();
+    }
+  }, [job]);
 
   if (!job) return null;
 
@@ -61,7 +79,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
     }
   };
 
-  // Generate Pitch / Cover Letter with Gemini
+  // Generate Pitch / Outreach with Gemini
   const handleGeneratePitch = async () => {
     setGeneratingPitch(true);
     setErrorNotice(null);
@@ -95,8 +113,8 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           status: localStatus,
           notes: localNotes,
           appliedDate: localAppliedDate || undefined,
+          coldPitch: pitchType === 'linkedin_dm' ? pitchContent : job.coldPitch,
           coverLetter: pitchType === 'cover_letter' ? pitchContent : job.coverLetter,
-          coldPitch: pitchType !== 'cover_letter' ? pitchContent : job.coldPitch,
         }),
       });
       const data = await res.json();
@@ -117,20 +135,27 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
   const analysis: MatchAnalysis | undefined = job.matchAnalysis;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-xs">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <dialog
+      ref={dialogRef}
+      onCancel={onClose}
+      className="m-auto backdrop:bg-black/60 backdrop:backdrop-blur-xs p-0 bg-transparent border-0 max-w-4xl w-full text-zinc-900 dark:text-zinc-100 open:animate-in open:fade-in open:zoom-in-95 duration-150"
+      style={{ overscrollBehavior: 'contain' }}
+    >
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Top Header */}
-        <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-start justify-between gap-4">
-          <div className="space-y-1">
+        <div className="p-6 sm:p-7 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-start justify-between gap-4">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+              <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
                 {job.source}
               </span>
               <span className="text-xs text-zinc-400">Added {new Date(job.createdAt).toLocaleDateString()}</span>
             </div>
+
             <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-50 leading-tight">
               {job.title}
             </h2>
+
             <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-zinc-600 dark:text-zinc-300 pt-1">
               <div className="flex items-center gap-1 font-semibold text-zinc-900 dark:text-white">
                 <Building2 className="w-4 h-4 text-indigo-500" />
@@ -141,12 +166,12 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                 <MapPin className="w-4 h-4 text-zinc-400" />
                 <span>{job.location}</span>
               </div>
-              {job.salary && (
+              {(job.salaryInLpa || job.salary) && (
                 <>
                   <span>•</span>
                   <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <DollarSign className="w-4 h-4" />
-                    <span>{job.salary}</span>
+                    <IndianRupee className="w-4 h-4" />
+                    <span>{job.salaryInLpa || job.salary}</span>
                   </div>
                 </>
               )}
@@ -159,9 +184,9 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                 href={job.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors"
               >
-                <span>Posting</span>
+                <span>Apply Link</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
@@ -175,19 +200,19 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 gap-6 text-sm font-semibold">
+        <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 sm:px-7 gap-6 text-sm font-semibold">
           <button
             onClick={() => setActiveTab('match')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`py-3.5 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'match'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold'
                 : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span>AI Fit Match</span>
+            <span>AI Match Analysis</span>
             {job.matchScore !== undefined && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold">
                 {job.matchScore}%
               </span>
             )}
@@ -195,19 +220,19 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
 
           <button
             onClick={() => setActiveTab('pitch')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`py-3.5 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'pitch'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold'
                 : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
             }`}
           >
             <Send className="w-4 h-4" />
-            <span>AI Pitch & Letters</span>
+            <span>Recruiter Outreach & Pitches</span>
           </button>
 
           <button
             onClick={() => setActiveTab('description')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`py-3.5 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'description'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold'
                 : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -219,7 +244,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
 
           <button
             onClick={() => setActiveTab('notes')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            className={`py-3.5 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'notes'
                 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold'
                 : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -231,9 +256,9 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 sm:p-7 space-y-6">
           {errorNotice && (
-            <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl text-xs">
+            <div className="flex items-center gap-2 p-3.5 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-medium">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorNotice}</span>
             </div>
@@ -242,11 +267,11 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           {/* TAB 1: AI FIT MATCH */}
           {activeTab === 'match' && (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-tr from-indigo-50/60 to-violet-50/40 dark:from-indigo-950/30 dark:to-violet-950/20 border border-indigo-200/50 dark:border-indigo-800/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex flex-col items-center justify-center font-black shadow-md shadow-indigo-600/20">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white flex flex-col items-center justify-center font-black shadow-xs">
                     <span className="text-xl leading-none">{job.matchScore ?? '—'}</span>
-                    <span className="text-[10px] tracking-wider font-semibold opacity-80">%</span>
+                    <span className="text-[10px] font-bold tracking-wider opacity-80">%</span>
                   </div>
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
@@ -256,7 +281,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                       {analysis?.recommendation || 'Evaluation Pending'}
                     </h3>
                     <p className="text-xs text-zinc-500">
-                      Evaluated against your active resume & target roles
+                      Evaluated against your active resume & Indian market preferences
                     </p>
                   </div>
                 </div>
@@ -264,17 +289,17 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                 <button
                   onClick={handleEvaluateMatch}
                   disabled={evaluating}
-                  className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {evaluating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Analyzing with Gemini...</span>
+                      <span>Evaluating with Gemini...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>{job.matchScore ? 'Re-Evaluate with Gemini' : 'Run Gemini AI Match'}</span>
+                      <span>{job.matchScore ? 'Re-Evaluate Match' : 'Run Gemini AI Match'}</span>
                     </>
                   )}
                 </button>
@@ -283,24 +308,54 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
               {analysis ? (
                 <div className="space-y-5">
                   {/* Summary */}
-                  <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/70 dark:border-zinc-800 rounded-2xl p-4">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
-                      Executive Summary
+                  <div className="bg-white dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                      Executive Fit Summary
                     </h4>
-                    <p className="text-sm text-zinc-700 dark:text-zinc-200 leading-relaxed">
+                    <p className="text-sm text-zinc-700 dark:text-zinc-200 leading-relaxed font-normal">
                       {analysis.summary}
                     </p>
                   </div>
 
+                  {/* India Market Parameter Match */}
+                  {analysis.indiaRelevance && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800">
+                        <span className="text-[11px] font-semibold text-zinc-500 block mb-1">
+                          📍 Location Fit:
+                        </span>
+                        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {analysis.indiaRelevance.locationFit}
+                        </span>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800">
+                        <span className="text-[11px] font-semibold text-zinc-500 block mb-1">
+                          💰 Compensation Fit:
+                        </span>
+                        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {analysis.indiaRelevance.salaryFit}
+                        </span>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800">
+                        <span className="text-[11px] font-semibold text-zinc-500 block mb-1">
+                          ⏳ Notice Period Fit:
+                        </span>
+                        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200">
+                          {analysis.indiaRelevance.noticePeriodFit}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Strengths & Gaps Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Strengths */}
-                    <div className="p-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/20 space-y-2.5">
+                    <div className="p-5 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10 space-y-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Key Alignment & Strengths</span>
                       </div>
-                      <ul className="space-y-1.5 text-xs text-zinc-700 dark:text-zinc-200">
+                      <ul className="space-y-2 text-xs text-zinc-700 dark:text-zinc-200">
                         {analysis.strengths?.map((str, i) => (
                           <li key={i} className="flex items-start gap-2">
                             <span className="text-emerald-500 font-bold shrink-0">✓</span>
@@ -311,12 +366,12 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                     </div>
 
                     {/* Gaps */}
-                    <div className="p-4 rounded-2xl border border-amber-200/60 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/20 space-y-2.5">
+                    <div className="p-5 rounded-2xl border border-amber-200/80 dark:border-amber-900/40 bg-amber-50/20 dark:bg-amber-950/10 space-y-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
                         <AlertCircle className="w-4 h-4" />
-                        <span>Skill Gaps & Considerations</span>
+                        <span>Skill Gaps / Things to Prepare</span>
                       </div>
-                      <ul className="space-y-1.5 text-xs text-zinc-700 dark:text-zinc-200">
+                      <ul className="space-y-2 text-xs text-zinc-700 dark:text-zinc-200">
                         {analysis.gaps?.length ? (
                           analysis.gaps.map((gap, i) => (
                             <li key={i} className="flex items-start gap-2">
@@ -325,7 +380,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                             </li>
                           ))
                         ) : (
-                          <li className="text-zinc-400 italic">No significant gaps detected.</li>
+                          <li className="text-zinc-400 italic">No major skill gaps identified.</li>
                         )}
                       </ul>
                     </div>
@@ -333,10 +388,10 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
 
                   {/* Interview Talking Points */}
                   {analysis.interviewTalkingPoints?.length > 0 && (
-                    <div className="p-4 rounded-2xl border border-indigo-200/60 dark:border-indigo-900/40 bg-indigo-50/20 dark:bg-indigo-950/20 space-y-2.5">
+                    <div className="p-5 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/40 bg-indigo-50/10 dark:bg-indigo-950/10 space-y-3">
                       <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                         <Lightbulb className="w-4 h-4 text-indigo-500" />
-                        <span>Recommended Interview Talking Points</span>
+                        <span>Recommended Screening Talking Points</span>
                       </div>
                       <ul className="space-y-2 text-xs text-zinc-700 dark:text-zinc-200">
                         {analysis.interviewTalkingPoints.map((point, i) => (
@@ -352,53 +407,53 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                   )}
                 </div>
               ) : (
-                <div className="text-center py-12 border border-dashed border-zinc-300 dark:border-zinc-800 rounded-2xl p-6">
-                  <Sparkles className="w-8 h-8 text-indigo-400 mx-auto mb-2 animate-bounce" />
+                <div className="text-center py-12 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-6">
+                  <Sparkles className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
                   <h4 className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm">
-                    Fit analysis not generated yet
+                    Fit evaluation not generated yet
                   </h4>
                   <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-1">
-                    Click &quot;Run Gemini AI Match&quot; above to cross-reference this role against your resume and get tactical tips.
+                    Click &quot;Run Gemini AI Match&quot; above to cross-reference your resume and discover your match score.
                   </p>
                 </div>
               )}
             </div>
           )}
 
-          {/* TAB 2: AI PITCH & COVER LETTER */}
+          {/* TAB 2: AI RECRUITER OUTREACH & LETTERS */}
           {activeTab === 'pitch' && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs font-semibold">
+                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl text-xs font-semibold">
                   <button
-                    onClick={() => setPitchType('cover_letter')}
-                    className={`px-3 py-1.5 rounded-lg transition-all ${
-                      pitchType === 'cover_letter'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
+                    onClick={() => setPitchType('linkedin_dm')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      pitchType === 'linkedin_dm'
+                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
                         : 'text-zinc-500 hover:text-zinc-900'
                     }`}
                   >
-                    Cover Letter
+                    LinkedIn Recruiter Note
                   </button>
                   <button
                     onClick={() => setPitchType('cold_email')}
-                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                       pitchType === 'cold_email'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
+                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
                         : 'text-zinc-500 hover:text-zinc-900'
                     }`}
                   >
                     Cold Email (Hiring Mgr)
                   </button>
                   <button
-                    onClick={() => setPitchType('linkedin_dm')}
-                    className={`px-3 py-1.5 rounded-lg transition-all ${
-                      pitchType === 'linkedin_dm'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
+                    onClick={() => setPitchType('cover_letter')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      pitchType === 'cover_letter'
+                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
                         : 'text-zinc-500 hover:text-zinc-900'
                     }`}
                   >
-                    LinkedIn DM
+                    Cover Letter
                   </button>
                 </div>
 
@@ -406,7 +461,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                   <button
                     onClick={handleGeneratePitch}
                     disabled={generatingPitch}
-                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
                   >
                     {generatingPitch ? (
                       <>
@@ -443,10 +498,10 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
               </div>
 
               <textarea
-                rows={12}
+                rows={11}
                 value={pitchContent}
                 onChange={(e) => setPitchContent(e.target.value)}
-                placeholder="Click 'Generate with Gemini' to craft a tailored message based on your resume and this job's requirements..."
+                placeholder="Click 'Generate with Gemini' to craft an outreach note tailored to this opening..."
                 className="w-full text-xs sm:text-sm p-4 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-2xl leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
               />
             </div>
@@ -456,11 +511,11 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           {activeTab === 'description' && (
             <div className="space-y-4">
               {job.requirements && job.requirements.length > 0 && (
-                <div className="bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">
-                    Extracted Requirements
+                    Key Role Requirements
                   </h4>
-                  <ul className="space-y-1 text-xs text-zinc-700 dark:text-zinc-300">
+                  <ul className="space-y-1.5 text-xs text-zinc-700 dark:text-zinc-300">
                     {job.requirements.map((req, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <span className="text-indigo-500 font-bold">•</span>
@@ -493,8 +548,8 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                   <option value="saved">Saved / Reviewing</option>
                   <option value="applied">Applied</option>
                   <option value="interviewing">Interviewing</option>
-                  <option value="offer">Offer</option>
-                  <option value="rejected">Archived / Rejected</option>
+                  <option value="offer">Offer Received</option>
+                  <option value="rejected">Archived</option>
                 </select>
               </div>
 
@@ -512,13 +567,13 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1.5">
-                  Private Notes & Follow-ups
+                  Private Application Notes
                 </label>
                 <textarea
                   rows={6}
                   value={localNotes}
                   onChange={(e) => setLocalNotes(e.target.value)}
-                  placeholder="e.g. Connected with engineering recruiter on LinkedIn; next round interview scheduled for Friday."
+                  placeholder="e.g. Connected with technical recruiter on LinkedIn; HR round scheduled for Thursday."
                   className="w-full text-sm p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
                 />
               </div>
@@ -533,6 +588,6 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

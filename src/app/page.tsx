@@ -2,19 +2,20 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
+import SmartFeedView from '@/components/SmartFeedView';
 import PipelineBoard from '@/components/PipelineBoard';
-import JobTableView from '@/components/JobTableView';
 import HarvesterView from '@/components/HarvesterView';
 import ProfileView from '@/components/ProfileView';
 import JobDetailModal from '@/components/JobDetailModal';
 import SettingsModal from '@/components/SettingsModal';
 import AddJobModal from '@/components/AddJobModal';
-import { Job, JobStatus } from '@/types/job';
-import { Search, SlidersHorizontal, Sparkles, Plus, Loader2 } from 'lucide-react';
+import { Job, JobStatus, UserProfile } from '@/types/job';
+import { Search, Sparkles, Plus, Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'table' | 'harvester' | 'profile'>('pipeline');
+  const [activeTab, setActiveTab] = useState<'feed' | 'pipeline' | 'harvester' | 'profile'>('feed');
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
@@ -22,23 +23,32 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddJobOpen, setIsAddJobOpen] = useState(false);
 
-  // Fetch jobs on mount
-  const fetchJobs = async () => {
+  // Fetch jobs and profile on mount
+  const fetchData = async () => {
     try {
-      const res = await fetch('/api/jobs');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.jobs)) {
-        setJobs(data.jobs);
+      const [jobsRes, profileRes] = await Promise.all([
+        fetch('/api/jobs'),
+        fetch('/api/profile'),
+      ]);
+
+      const jobsData = await jobsRes.json();
+      if (jobsData.success && Array.isArray(jobsData.jobs)) {
+        setJobs(jobsData.jobs);
+      }
+
+      const profileData = await profileRes.json();
+      if (profileData.success && profileData.profile) {
+        setProfile(profileData.profile);
       }
     } catch (err) {
-      console.error('Failed to fetch jobs:', err);
+      console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchJobs();
+    fetchData();
   }, []);
 
   // Compute live pipeline statistics
@@ -59,7 +69,6 @@ export default function Home() {
 
   // Status Updater
   const handleUpdateStatus = async (jobId: string, newStatus: JobStatus) => {
-    // Optimistic update
     setJobs((prev) =>
       prev.map((j) => (j.id === jobId ? { ...j, status: newStatus, updatedAt: new Date().toISOString() } : j))
     );
@@ -108,30 +117,31 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50/60 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         openSettings={() => setIsSettingsOpen(true)}
         openAddJob={() => setIsAddJobOpen(true)}
+        profile={profile}
         stats={stats}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        {/* Controls Bar for Pipeline & Table */}
-        {(activeTab === 'pipeline' || activeTab === 'table') && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 bg-white dark:bg-zinc-900 p-2.5 sm:p-3 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-xs">
+        {/* Search & Filter Controls (Visible on Feed & Pipeline) */}
+        {(activeTab === 'feed' || activeTab === 'pipeline') && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6 bg-white dark:bg-zinc-900 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
             {/* Search Input */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search roles, companies, locations, tech..."
+                placeholder="Search roles (e.g. SDE 2, Frontend), companies (Razorpay, Swiggy), or Indian cities..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-zinc-400"
+                className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-zinc-400"
               />
             </div>
 
@@ -142,41 +152,41 @@ export default function Home() {
                   onClick={() => setMinScoreFilter(0)}
                   className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     minScoreFilter === 0
-                      ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
-                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                      ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+                      : 'text-zinc-500 hover:text-zinc-800'
                   }`}
                 >
-                  All Matches
+                  All Roles
                 </button>
                 <button
-                  onClick={() => setMinScoreFilter(80)}
+                  onClick={() => setMinScoreFilter(90)}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    minScoreFilter === 80
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    minScoreFilter === 90
+                      ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                      : 'text-zinc-500 hover:text-zinc-800'
                   }`}
                 >
                   <Sparkles className="w-3 h-3" />
-                  <span>80%+ Fit</span>
+                  <span>90%+ Fit</span>
                 </button>
                 <button
-                  onClick={() => setMinScoreFilter(70)}
+                  onClick={() => setMinScoreFilter(75)}
                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                    minScoreFilter === 70
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    minScoreFilter === 75
+                      ? 'bg-blue-600 text-white shadow-xs font-bold'
+                      : 'text-zinc-500 hover:text-zinc-800'
                   }`}
                 >
-                  <span>70%+ Fit</span>
+                  <span>75%+ Fit</span>
                 </button>
               </div>
 
               <button
                 onClick={() => setIsAddJobOpen(true)}
-                className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold px-3 py-2 rounded-xl border border-indigo-200/50 dark:border-indigo-800/50 transition-colors cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Quick Add</span>
+                <span className="hidden sm:inline">Add Role</span>
               </button>
             </div>
           </div>
@@ -185,27 +195,27 @@ export default function Home() {
         {/* Tab Views */}
         {loading ? (
           <div className="py-24 text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-500" />
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600" />
             <p className="text-xs text-zinc-400 mt-2">Loading your job pipeline...</p>
           </div>
         ) : (
           <>
-            {activeTab === 'pipeline' && (
-              <PipelineBoard
+            {activeTab === 'feed' && (
+              <SmartFeedView
                 jobs={jobs}
                 onSelectJob={(job) => setSelectedJob(job)}
                 onUpdateStatus={handleUpdateStatus}
+                onDeleteJob={handleDeleteJob}
                 searchFilter={searchFilter}
                 minScoreFilter={minScoreFilter}
               />
             )}
 
-            {activeTab === 'table' && (
-              <JobTableView
+            {activeTab === 'pipeline' && (
+              <PipelineBoard
                 jobs={jobs}
                 onSelectJob={(job) => setSelectedJob(job)}
                 onUpdateStatus={handleUpdateStatus}
-                onDeleteJob={handleDeleteJob}
                 searchFilter={searchFilter}
                 minScoreFilter={minScoreFilter}
               />

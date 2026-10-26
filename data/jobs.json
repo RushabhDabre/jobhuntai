@@ -1,130 +1,144 @@
 [
   {
-    "id": "job-1793016424545-5c9o2",
-    "title": "Abuse Investigator",
-    "company": "Stripe",
-    "location": "Dublin",
-    "remoteType": "unknown",
-    "url": "https://stripe.com/jobs/search?gh_jid=8172487",
+    "id": "job-india-1",
+    "title": "Senior Software Engineer (Frontend / Fullstack)",
+    "company": "Razorpay",
+    "location": "Bengaluru, Karnataka, India",
+    "city": "Bengaluru",
+    "remoteType": "hybrid",
+    "salaryInLpa": "₹32 - ₹42 LPA",
+    "salary": "₹32 - ₹42 LPA + ESOPs",
+    "experienceRequired": "4 - 7 years",
+    "url": "https://razorpay.com/jobs",
     "source": "greenhouse",
-    "description": "<h2><strong>Who we are </strong></h2>\n<h3><strong>About Stripe</strong></h3>\n<p><span style=\"font-weight: 400;\">Stripe is a financial infrastructure platform for businesses. Millions of companies - from the world’s largest enterprises to the most ambitious startups - use Stripe to accept payments, grow their revenue, and accelerate new business opportunities. Our mission is to increase the GDP of the internet, and we have a staggering amount of work ahead. That means you have an unprecedented opportunity to put the global economy within everyone&#39;s reach while doing the most important work of your career.</span></p>\n<h3><strong>About the team</strong></h3>\n<p>Abuse Operations is the front-line incident response and remediation function handling active product abuse and fraud impacting Stripe and its merchants. This multi-disciplinary group, spanning Incident Managers, Investigators, Forward Deployed Security Engineers, and Data Scientists, neutralizes active attacks, gathers requirements for operational tooling, and leads incidents. The team&nbsp; works directly with impacted merchants to resolve technical incidents and policy abuse rapidly. Operating primarily across Eastern, Pacific and Western European time zones, these team members regularly coordinate with global stakeholders across the world.</p>\n<h2><strong>What you’ll do</strong></h2>\n<p>You&#39;ll play a critical role in safeguarding our financial ecosystem by investigating high-risk accounts and identifying complex patterns of fraud during incidents. You will lead incident response for product abuse and fraud events, conducting deep-dive analyses to identify root causes. By collaborating cross-functionally, you will drive improvements that enhance our fraud detection and prevention strategies at scale. Your expertise will be essential in automating response processes through agentic approaches, allowing us to safeguard merchants and neutralize threats with speed and precision.</p>\n<h3><strong>Responsibilities</strong></h3>\n<ul>\n<li>Investigate, mitigate, and remediate urgent fraud incidents (e.g., ATO, card testing), utilizing FT3-mapped detection and signals enrichment to reduce uncertainty and accelerate response.</li>\n<li>As part of incidents, analyze high-risk accounts to identify fraudulent merchants, card testing, account takeovers, and other fraud vectors, classifying them using FT3 (Fraud Taxonomy 3.0) to standardize threat intelligence.</li>\n<li>Lead incident root cause analyses to identify gaps in current systems and strategies, leveraging the FT3 framework, data-driven model to drive enhancements and process improvements for emerging fraud risks.</li>\n<li>Streamline incident response capabilities, ensuring the tooling and processes are clear, accurate and efficient</li>\n<li>Work cross-functionally with security, fraud and data science teams to build agentic solutions for responding to abuse incidents at scale</li>\n<li>Effectively communicate cross-functionally with legal and policy teams to assess and mitigate risks, while demonstrating strong problem-solving under pressure.</li>\n<li>Collaborate effectively with teammates, leading projects, mentoring others, and developing and championing quality standards within the team</li>\n</ul>\n<h2><strong>Who you are</strong></h2>\n<p><span style=\"font-weight: 400;\">We&#39;re looking for someone who meets the minimum requirements to be considered for the role. If you meet these requirements, you are encouraged to apply. The preferred qualifications are a bonus, not a requirement.</span></p>\n<h3><strong>Minimum requirements</strong></h3>\n<ul>\n<li>5+ years of experience conducting incident response in security, product abuse or trust domains</li>\n<li>5+ years experience analyzing large data sets to solve problems and/or building models with a behavioral approach to fraud detection</li>\n<li>B.S. or M.S. Computer Science or related field, or equivalent experience</li>\n<li>Expert knowledge of Python and SQL, and familiarity with other programming languages</li>\n<li>Existing experience with log analysis (e.g. first or third party applications, system / data access, event logs), network security, digital forensics, and incident response investigations</li>\n<li>Ability to communicate results clearly and focus on impact</li>\n<li>Ability to think creatively and holistically about reducing risk in a complex environment</li>\n</ul>\n<h3><strong>Preferred qualifications</strong></h3>\n<ul>\n<li>An adversarial mindset, understanding the goals, behaviors, and TTPs of threat actors.</li>\n<li>Experience with engineering, data processing and analysis tools (e.g. Databricks, Trino, etc.)</li>\n<li>Familiarity with common open-source frameworks for big data processing and/or data science (PySpark, Pandas, Sci-kit Learn, etc.)</li>\n<li>Experience with tactical threat intelligence and/or hunting for sophisticated threat actors in an enterprise environment</li>\n<li>Ability to proactively challenge the status quo by leveraging data and taking a user-centric approach to address complex product integrity challenges</li>\n</ul>",
-    "department": "8611 Security Analytics",
-    "status": "discovered",
-    "createdAt": "2026-10-26T12:07:04.543Z",
-    "updatedAt": "2026-10-26T12:07:04.559Z"
-  },
-  {
-    "id": "job-1793016424543-qt72i",
-    "title": "Abuse Investigator",
-    "company": "Stripe",
-    "location": "Dublin",
-    "remoteType": "unknown",
-    "url": "https://stripe.com/jobs/search?gh_jid=8172508",
-    "source": "greenhouse",
-    "description": "<h2><strong>Who we are </strong></h2>\n<h3><strong>About Stripe</strong></h3>\n<p><span style=\"font-weight: 400;\">Stripe is a financial infrastructure platform for businesses. Millions of companies - from the world’s largest enterprises to the most ambitious startups - use Stripe to accept payments, grow their revenue, and accelerate new business opportunities. Our mission is to increase the GDP of the internet, and we have a staggering amount of work ahead. That means you have an unprecedented opportunity to put the global economy within everyone&#39;s reach while doing the most important work of your career.</span></p>\n<h3><strong>About the team</strong></h3>\n<p>Abuse Operations is the front-line incident response and remediation function handling active product abuse and fraud impacting Stripe and its merchants. This multi-disciplinary group, spanning Incident Managers, Investigators, Forward Deployed Security Engineers, and Data Scientists, neutralizes active attacks, gathers requirements for operational tooling, and leads incidents. The team&nbsp; works directly with impacted merchants to resolve technical incidents and policy abuse rapidly. Operating primarily across Eastern, Pacific and Western European time zones, these team members regularly coordinate with global stakeholders across the world.</p>\n<h2><strong>What you’ll do</strong></h2>\n<p>You&#39;ll play a critical role in safeguarding our financial ecosystem by investigating high-risk accounts and identifying complex patterns of fraud during incidents. You will lead incident response for product abuse and fraud events, conducting deep-dive analyses to identify root causes. By collaborating cross-functionally, you will drive improvements that enhance our fraud detection and prevention strategies at scale. Your expertise will be essential in automating response processes through agentic approaches, allowing us to safeguard merchants and neutralize threats with speed and precision.</p>\n<h3><strong>Responsibilities</strong></h3>\n<ul>\n<li>Investigate, mitigate, and remediate urgent fraud incidents (e.g., ATO, card testing), utilizing FT3-mapped detection and signals enrichment to reduce uncertainty and accelerate response.</li>\n<li>As part of incidents, analyze high-risk accounts to identify fraudulent merchants, card testing, account takeovers, and other fraud vectors, classifying them using FT3 (Fraud Taxonomy 3.0) to standardize threat intelligence.</li>\n<li>Lead incident root cause analyses to identify gaps in current systems and strategies, leveraging the FT3 framework, data-driven model to drive enhancements and process improvements for emerging fraud risks.</li>\n<li>Streamline incident response capabilities, ensuring the tooling and processes are clear, accurate and efficient</li>\n<li>Work cross-functionally with security, fraud and data science teams to build agentic solutions for responding to abuse incidents at scale</li>\n<li>Effectively communicate cross-functionally with legal and policy teams to assess and mitigate risks, while demonstrating strong problem-solving under pressure.</li>\n<li>Collaborate effectively with teammates, leading projects, mentoring others, and developing and championing quality standards within the team</li>\n</ul>\n<h2><strong>Who you are</strong></h2>\n<p><span style=\"font-weight: 400;\">We&#39;re looking for someone who meets the minimum requirements to be considered for the role. If you meet these requirements, you are encouraged to apply. The preferred qualifications are a bonus, not a requirement.</span></p>\n<h3><strong>Minimum requirements</strong></h3>\n<ul>\n<li>3+ years of experience conducting incident response in security, product abuse or trust domains</li>\n<li>3+ years experience analyzing large data sets to solve problems and/or building models with a behavioral approach to fraud detection</li>\n<li>B.S. or M.S. Computer Science or related field, or equivalent experience</li>\n<li>Expert knowledge of Python and SQL, and familiarity with other programming languages</li>\n<li>Existing experience with log analysis (e.g. first or third party applications, system / data access, event logs), network security, digital forensics, and incident response investigations</li>\n<li>Ability to communicate results clearly and focus on impact</li>\n<li>Ability to think creatively and holistically about reducing risk in a complex environment</li>\n</ul>\n<h3><strong>Preferred qualifications</strong></h3>\n<ul>\n<li>An adversarial mindset, understanding the goals, behaviors, and TTPs of threat actors.</li>\n<li>Experience with engineering, data processing and analysis tools (e.g. Databricks, Trino, etc.)</li>\n<li>Familiarity with common open-source frameworks for big data processing and/or data science (PySpark, Pandas, Sci-kit Learn, etc.)</li>\n<li>Experience with tactical threat intelligence and/or hunting for sophisticated threat actors in an enterprise environment</li>\n<li>Ability to proactively challenge the status quo by leveraging data and taking a user-centric approach to address complex product integrity challenges</li>\n</ul>",
-    "department": "8611 Security Analytics",
-    "status": "discovered",
-    "createdAt": "2026-10-26T12:07:04.543Z",
-    "updatedAt": "2026-10-26T12:07:04.544Z"
-  },
-  {
-    "id": "job-seed-1",
-    "title": "Senior Frontend / Fullstack Engineer",
-    "company": "Linear",
-    "location": "Remote",
-    "remoteType": "remote",
-    "salary": "$160,000 - $210,000",
-    "url": "https://linear.app/careers",
-    "source": "firecrawl",
-    "description": "We are looking for a Senior Frontend / Fullstack Engineer to craft best-in-class product experiences.\nResponsibilities:\n- Build high-performance, keyboard-first web applications using React, TypeScript, and modern CSS.\n- Optimize client-side state synchronization, local-first architectures, and rendering performance.\n- Collaborate with designers and product engineers to ship delightful features with exceptional attention to detail.\nRequirements:\n- 4+ years of professional experience with React and TypeScript.\n- Strong eye for UI craft, micro-interactions, and accessibility.\n- Experience with real-time web applications, state management, and modern browser APIs.",
+    "description": "Razorpay is India's leading fintech payments platform. We are seeking a Senior Software Engineer to build resilient, accessible payment checkout experiences and merchant dashboards.\n\nResponsibilities:\n- Build low-latency, resilient web UI using React, TypeScript, and modern state architectures.\n- Scale frontend infrastructure serving millions of transactions across India.\n- Work closely with backend teams, design, and product managers to launch innovative merchant features.\n\nRequirements:\n- 4+ years of hands-on experience in modern frontend and web technologies (React, TypeScript).\n- Deep understanding of browser internals, web performance, and responsive interfaces.\n- Experience with payment flows or high-traffic consumer systems is a plus.",
     "requirements": [
-      "4+ years React and TypeScript",
-      "High attention to UI craft and performance",
-      "Local-first / modern web state knowledge"
+      "4+ years React & TypeScript",
+      "Web performance & Core Web Vitals optimization",
+      "Experience with scalable frontend systems"
     ],
     "status": "saved",
-    "matchScore": 92,
+    "matchScore": 94,
     "matchAnalysis": {
-      "score": 92,
+      "score": 94,
       "recommendation": "Strong Fit",
-      "summary": "Outstanding alignment with your 5 years of React/TypeScript experience, Next.js UI performance work, and strong product craft.",
+      "summary": "Exceptional match! Your 4.5 years of React/TypeScript experience, LCP optimization background, and Bengaluru location strongly align with Razorpay engineering standards.",
       "strengths": [
-        "5+ years deep React & TypeScript mastery",
-        "Proven track record optimizing Core Web Vitals and client rendering",
-        "Full alignment on remote work preference"
+        "Direct alignment with 4+ years React and TypeScript tech stack",
+        "Demonstrated Core Web Vitals LCP optimization track record",
+        "Immediate location match in Bengaluru"
       ],
       "gaps": [
-        "Linear places strong emphasis on local-first sync engines (Replicache/CRDTs) which is worth highlighting"
+        "Fintech payment protocols and security compliance experience can be highlighted during interview"
       ],
       "interviewTalkingPoints": [
-        "Share your Next.js App Router performance optimizations and how you minimized render lag",
-        "Discuss your approach to keyboard navigation and responsive micro-interactions"
+        "Discuss how you handled high throughput API requests and client-side error states",
+        "Highlight your App Router migration and 45% LCP load reduction"
       ],
-      "evaluatedAt": "2026-10-26T12:06:14.915Z"
+      "indiaRelevance": {
+        "locationFit": "Matches preferred city (Bengaluru)",
+        "salaryFit": "Within your expected bracket (₹28 - ₹35 LPA vs ₹32 - ₹42 LPA)",
+        "noticePeriodFit": "30 Days notice period is widely accepted at Razorpay"
+      },
+      "evaluatedAt": "2026-10-26T18:12:05.504Z"
     },
-    "notes": "Exciting product! Reach out to engineering team on X/LinkedIn.",
-    "createdAt": "2026-10-26T12:06:14.915Z",
-    "updatedAt": "2026-10-26T12:06:14.915Z"
+    "notes": "Razorpay engineering bar is high on JS fundamentals and system design. Reaching out to recruiter on LinkedIn.",
+    "createdAt": "2026-10-26T18:12:05.504Z",
+    "updatedAt": "2026-10-26T18:12:05.504Z"
   },
   {
-    "id": "job-seed-2",
-    "title": "AI Platform Software Engineer",
-    "company": "Anthropic",
-    "location": "San Francisco, CA / Remote",
-    "remoteType": "hybrid",
-    "salary": "$180,000 - $240,000",
-    "url": "https://anthropic.com/careers",
-    "source": "firecrawl",
-    "description": "Join Anthropic to build user-facing platforms and tooling for frontier AI models.\nResponsibilities:\n- Build internal and developer-facing web interfaces for model evaluation and API orchestration.\n- Connect complex agentic workflows, streaming inference pipelines, and scalable APIs.\n- Work with Python, TypeScript, and modern web application frameworks.\nRequirements:\n- Strong experience with TypeScript, Python, and cloud infrastructure.\n- Experience building developer tools, LLM applications, or data pipelines.",
+    "id": "job-india-2",
+    "title": "SDE 2 - Full Stack Engineer (Growth & AI)",
+    "company": "Swiggy",
+    "location": "Bengaluru / Remote (India)",
+    "city": "Bengaluru",
+    "remoteType": "remote",
+    "salaryInLpa": "₹28 - ₹36 LPA",
+    "salary": "₹28 - ₹36 LPA",
+    "experienceRequired": "3 - 6 years",
+    "url": "https://careers.swiggy.com",
+    "source": "lever",
+    "description": "Swiggy is building consumer tech that powers convenience for millions of Indians every day.\nWe are looking for an SDE 2 to join the Growth engineering team.\n\nResponsibilities:\n- Build and maintain high-conversion customer touchpoints on web and app-web views.\n- Integrate automated experiments, feature flags, and AI-driven personalization pipelines.\n- Collaborate with backend engineers on Node.js/Java microservices.\n\nRequirements:\n- 3+ years experience with React, TypeScript, and Node.js.\n- Strong problem-solving skills and experience with high-scale web platforms.",
     "requirements": [
+      "React",
       "TypeScript",
-      "Python",
-      "LLM orchestration",
-      "Fullstack API design"
+      "Node.js",
+      "System Design basics"
     ],
     "status": "discovered",
-    "matchScore": 88,
+    "matchScore": 90,
     "matchAnalysis": {
-      "score": 88,
+      "score": 90,
       "recommendation": "Strong Fit",
-      "summary": "Great match with your background in AI integration, Python services, and TypeScript web dashboards.",
+      "summary": "High relevance for your experience with fullstack Node/React stacks and AI application experiments.",
       "strengths": [
-        "Hands-on LLM application development experience",
-        "Solid dual proficiency in TypeScript and Python",
-        "Background with scraping and data pipelines"
+        "Fullstack JavaScript/TypeScript mastery",
+        "Strong alignment with target CTC bracket (₹28 - ₹36 LPA)",
+        "Remote India flexibility"
       ],
       "gaps": [
-        "Hybrid preference noted in San Francisco; check remote flexibility for this specific role"
+        "Familiarity with large-scale A/B testing infrastructure"
       ],
       "interviewTalkingPoints": [
-        "Highlight your experience connecting streaming model responses with responsive frontends",
-        "Talk about handling rate limits, error fallbacks, and agent evaluation"
+        "Explain how you integrated LLMs into existing web services",
+        "Walk through your microservice architecture with Node and PostgreSQL"
       ],
-      "evaluatedAt": "2026-10-26T12:06:14.915Z"
+      "indiaRelevance": {
+        "locationFit": "Offers Remote (India) or Bengaluru office",
+        "salaryFit": "Perfect match for ₹28 - ₹35 LPA expected CTC",
+        "noticePeriodFit": "30 days notice is accepted"
+      },
+      "evaluatedAt": "2026-10-26T18:12:05.504Z"
     },
-    "createdAt": "2026-10-26T12:06:14.915Z",
-    "updatedAt": "2026-10-26T12:06:14.915Z"
+    "createdAt": "2026-10-26T18:12:05.504Z",
+    "updatedAt": "2026-10-26T18:12:05.504Z"
   },
   {
-    "id": "job-seed-3",
-    "title": "Full Stack Engineer - Growth & Automation",
-    "company": "Stripe",
-    "location": "Remote",
+    "id": "job-india-3",
+    "title": "Senior Software Engineer - Cloud & Web Platforms",
+    "company": "Atlassian India",
+    "location": "Bengaluru, India / Remote (Work from Anywhere in India)",
+    "city": "Bengaluru",
     "remoteType": "remote",
-    "salary": "$170,000 - $220,000",
-    "url": "https://stripe.com/jobs",
-    "source": "apify",
-    "description": "Stripe is looking for engineers to accelerate developer onboarding and autonomous growth loops.\nYou will build fullstack web platforms, design reliable data pipelines, and integrate AI-assisted customer workflows.\nRequirements:\n- 3+ years full stack web development (JavaScript/TypeScript, Ruby, or Python).\n- Passion for API reliability, payment systems, and developer ergonomics.",
+    "salaryInLpa": "₹40 - ₹52 LPA",
+    "salary": "₹40 - ₹52 LPA + Stocks",
+    "experienceRequired": "4 - 8 years",
+    "url": "https://www.atlassian.com/company/careers",
+    "source": "firecrawl",
+    "description": "Atlassian fuels team collaboration across the world (Jira, Confluence, Trello).\nAtlassian India operates with Team Anywhere policy (work anywhere in India).\n\nRole:\n- Build robust developer interfaces and cloud features using React, TypeScript, GraphQL, and modern web standards.\n- Champion accessibility, performance, and cross-browser reliability.\n- Participate in distributed architectural reviews and code mentorship.\n\nRequirements:\n- 4+ years of production web engineering experience.\n- Deep expertise in JavaScript/TypeScript, modern frontend patterns, and distributed web services.",
     "requirements": [
-      "3+ years Fullstack",
-      "APIs & Web apps",
-      "Growth/Data automation"
+      "React & TypeScript",
+      "Team Anywhere in India",
+      "4+ years SDE experience"
     ],
     "status": "applied",
-    "matchScore": 85,
-    "appliedDate": "2026-10-24",
-    "notes": "Submitted application through employee referral link.",
-    "createdAt": "2026-10-26T12:06:14.915Z",
-    "updatedAt": "2026-10-26T12:06:14.915Z"
+    "matchScore": 89,
+    "appliedDate": "2026-10-25",
+    "notes": "Submitted via employee referral. Team Anywhere in India policy is top tier.",
+    "createdAt": "2026-10-26T18:12:05.504Z",
+    "updatedAt": "2026-10-26T18:12:05.504Z"
+  },
+  {
+    "id": "job-india-4",
+    "title": "Frontend Engineer 2",
+    "company": "BrowserStack",
+    "location": "Mumbai / Remote (India)",
+    "city": "Mumbai",
+    "remoteType": "remote",
+    "salaryInLpa": "₹22 - ₹30 LPA",
+    "salary": "₹22 - ₹30 LPA",
+    "experienceRequired": "3 - 6 years",
+    "url": "https://www.browserstack.com/careers",
+    "source": "ashby",
+    "description": "BrowserStack is the world's leading software testing platform, built proudly from India.\nJoin our core product team to craft high-speed developer testing dashboards and interactive devtools.\n\nRequirements:\n- 3+ years experience building complex single page applications in React/TypeScript.\n- Passion for developer tools, canvas/DOM performance, and web standards.",
+    "requirements": [
+      "React",
+      "TypeScript",
+      "DevTools / Testing mindset"
+    ],
+    "status": "discovered",
+    "matchScore": 86,
+    "createdAt": "2026-10-26T18:12:05.504Z",
+    "updatedAt": "2026-10-26T18:12:05.504Z"
   }
 ]

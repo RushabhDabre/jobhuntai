@@ -10,6 +10,9 @@ export type JobStatus =
 export type JobSource =
   | 'firecrawl'
   | 'apify'
+  | 'naukri'
+  | 'instahyre'
+  | 'linkedin-india'
   | 'greenhouse'
   | 'lever'
   | 'ashby'
@@ -22,6 +25,11 @@ export interface MatchAnalysis {
   strengths: string[];
   gaps: string[];
   interviewTalkingPoints: string[];
+  indiaRelevance?: {
+    locationFit: string;
+    salaryFit: string;
+    noticePeriodFit: string;
+  };
   evaluatedAt: string;
 }
 
@@ -30,18 +38,22 @@ export interface Job {
   title: string;
   company: string;
   location: string;
+  city?: string; // Bengaluru, Hyderabad, Pune, Mumbai, Delhi-NCR, Chennai, Remote
   remoteType?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
   salary?: string;
+  salaryInLpa?: string; // e.g. "₹24 - ₹32 LPA"
   url: string;
   source: JobSource;
   description: string;
   requirements?: string[];
   department?: string;
+  experienceRequired?: string; // e.g. "3-5 years"
   status: JobStatus;
   matchScore?: number;
   matchAnalysis?: MatchAnalysis;
   coverLetter?: string;
   coldPitch?: string;
+  linkedinDm?: string;
   notes?: string;
   appliedDate?: string;
   createdAt: string;
@@ -51,13 +63,18 @@ export interface Job {
 export interface UserProfile {
   name: string;
   email?: string;
+  phone?: string;
+  currentLocation: string; // e.g. "Bengaluru, India"
+  preferredLocations: string[]; // e.g. ["Bengaluru", "Pune", "Hyderabad", "Remote (India)"]
   targetTitles: string[];
-  targetLocations: string[];
-  preferredRemote: boolean;
   yearsOfExperience: number;
-  minSalary?: string;
+  currentCtc?: string; // e.g. "₹18 LPA"
+  expectedCtc?: string; // e.g. "₹28 - ₹35 LPA"
+  noticePeriod: 'Immediate Joiner' | '15 Days' | '30 Days' | '60 Days' | '90 Days' | 'Serving Notice';
+  preferredWorkMode: 'remote' | 'hybrid' | 'onsite' | 'any';
   skills: string[];
   resumeText: string;
+  resumeFileName?: string;
   bioNotes?: string;
   updatedAt: string;
 }
@@ -67,11 +84,6 @@ export interface AppSettings {
   firecrawlApiKey?: string;
   apifyApiToken?: string;
   defaultGeminiModel?: string;
+  targetMarket?: string; // Default: "India"
   updatedAt: string;
-}
-
-export interface HarvestResult {
-  jobs: Partial<Job>[];
-  source: JobSource;
-  meta?: Record<string, unknown>;
 }

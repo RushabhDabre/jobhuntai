@@ -12,7 +12,9 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
+  Building2,
+  MapPin,
+  IndianRupee,
 } from 'lucide-react';
 import { Job } from '@/types/job';
 
@@ -21,72 +23,85 @@ interface HarvesterViewProps {
   openSettings: () => void;
 }
 
+const INDIAN_TECH_PRESETS = [
+  { name: 'Razorpay', slug: 'razorpay', platform: 'greenhouse' as const, city: 'Bengaluru' },
+  { name: 'Swiggy', slug: 'swiggy', platform: 'lever' as const, city: 'Bengaluru' },
+  { name: 'CRED', slug: 'cred', platform: 'greenhouse' as const, city: 'Bengaluru' },
+  { name: 'BrowserStack', slug: 'browserstack', platform: 'ashby' as const, city: 'Mumbai / Remote' },
+  { name: 'Atlassian India', slug: 'atlassian', platform: 'greenhouse' as const, city: 'Bengaluru / Remote' },
+  { name: 'Zepto', slug: 'zepto', platform: 'lever' as const, city: 'Bengaluru / Mumbai' },
+  { name: 'Postman', slug: 'postman', platform: 'greenhouse' as const, city: 'Bengaluru / Remote' },
+  { name: 'Hasura', slug: 'hasura', platform: 'lever' as const, city: 'Bengaluru / Remote' },
+];
+
 export default function HarvesterView({ onJobsImported, openSettings }: HarvesterViewProps) {
-  const [activeSource, setActiveSource] = useState<'firecrawl' | 'apify' | 'ats' | 'manual'>('firecrawl');
+  const [activeSource, setActiveSource] = useState<'ats' | 'apify' | 'firecrawl' | 'manual'>('ats');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [autoScore, setAutoScore] = useState(true);
+
+  // ATS State
+  const [atsPlatform, setAtsPlatform] = useState<'greenhouse' | 'lever' | 'ashby'>('greenhouse');
+  const [atsSlug, setAtsSlug] = useState('razorpay');
+  const [atsKeyword, setAtsKeyword] = useState('Engineer');
+
+  // Apify State
+  const [apifyProvider, setApifyProvider] = useState<'google-jobs' | 'linkedin' | 'indeed' | 'custom'>('google-jobs');
+  const [apifyQuery, setApifyQuery] = useState('Full Stack Engineer');
+  const [apifyLocation, setApifyLocation] = useState('Bengaluru, India');
+  const [apifyMaxItems, setApifyMaxItems] = useState(5);
+  const [apifyActorId, setApifyActorId] = useState('');
 
   // Firecrawl State
   const [firecrawlUrl, setFirecrawlUrl] = useState('');
   const [firecrawlMode, setFirecrawlMode] = useState<'scrape' | 'crawl'>('scrape');
 
-  // Apify State
-  const [apifyProvider, setApifyProvider] = useState<'google-jobs' | 'linkedin' | 'indeed' | 'custom'>('google-jobs');
-  const [apifyQuery, setApifyQuery] = useState('Full Stack Engineer');
-  const [apifyLocation, setApifyLocation] = useState('Remote');
-  const [apifyMaxItems, setApifyMaxItems] = useState(5);
-  const [apifyActorId, setApifyActorId] = useState('');
-
-  // ATS State
-  const [atsPlatform, setAtsPlatform] = useState<'greenhouse' | 'lever' | 'ashby'>('greenhouse');
-  const [atsSlug, setAtsSlug] = useState('stripe');
-  const [atsKeyword, setAtsKeyword] = useState('Engineer');
-
   // Manual State
   const [manualTitle, setManualTitle] = useState('');
   const [manualCompany, setManualCompany] = useState('');
-  const [manualLocation, setManualLocation] = useState('Remote');
+  const [manualLocation, setManualLocation] = useState('Bengaluru, India');
+  const [manualSalary, setManualSalary] = useState('₹25 - ₹35 LPA');
   const [manualUrl, setManualUrl] = useState('');
   const [manualDescription, setManualDescription] = useState('');
 
-  // Run Firecrawl
-  const handleFirecrawlSubmit = async (e: React.FormEvent) => {
+  // Run ATS Board Scrape
+  const handleAtsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firecrawlUrl) return;
+    if (!atsSlug) return;
     setLoading(true);
     setStatusMessage(null);
 
     try {
-      const res = await fetch('/api/harvest/firecrawl', {
+      const res = await fetch('/api/harvest/ats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: firecrawlUrl,
-          mode: firecrawlMode,
+          platform: atsPlatform,
+          companySlug: atsSlug,
+          keywordFilter: atsKeyword,
+          limit: 10,
           autoScore,
         }),
       });
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error || 'Firecrawl failed');
+        throw new Error(data.error || 'ATS board fetch failed');
       }
 
-      if (data.mode === 'crawl') {
+      if (data.jobs && data.jobs.length > 0) {
+        onJobsImported(data.jobs);
         setStatusMessage({
           type: 'success',
-          text: `Found ${data.foundLinks?.length || 0} candidate job links. Check your terminal or console.`,
+          text: `Directly harvested ${data.jobs.length} open roles from ${atsSlug}'s public board!`,
         });
-      } else if (data.job) {
-        onJobsImported([data.job]);
+      } else {
         setStatusMessage({
-          type: 'success',
-          text: `Successfully scraped and imported "${data.job.title}" at ${data.job.company}!`,
+          type: 'error',
+          text: `No open roles found matching "${atsKeyword}" on ${atsSlug}'s board. Try a broader keyword like "Developer" or leave it blank.`,
         });
-        setFirecrawlUrl('');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Scraping failed';
+      const msg = err instanceof Error ? err.message : 'ATS scrape failed';
       setStatusMessage({ type: 'error', text: msg });
     } finally {
       setLoading(false);
@@ -121,7 +136,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
         onJobsImported(data.jobs);
         setStatusMessage({
           type: 'success',
-          text: `Successfully fetched and imported ${data.jobs.length} jobs via Apify!`,
+          text: `Successfully harvested and imported ${data.jobs.length} roles from Apify for ${apifyLocation}!`,
         });
       } else {
         setStatusMessage({
@@ -137,44 +152,43 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
     }
   };
 
-  // Run ATS Board Scrape
-  const handleAtsSubmit = async (e: React.FormEvent) => {
+  // Run Firecrawl
+  const handleFirecrawlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!atsSlug) return;
+    if (!firecrawlUrl) return;
     setLoading(true);
     setStatusMessage(null);
 
     try {
-      const res = await fetch('/api/harvest/ats', {
+      const res = await fetch('/api/harvest/firecrawl', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          platform: atsPlatform,
-          companySlug: atsSlug,
-          keywordFilter: atsKeyword,
-          limit: 10,
+          url: firecrawlUrl,
+          mode: firecrawlMode,
           autoScore,
         }),
       });
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error || 'ATS board fetch failed');
+        throw new Error(data.error || 'Firecrawl failed');
       }
 
-      if (data.jobs && data.jobs.length > 0) {
-        onJobsImported(data.jobs);
+      if (data.mode === 'crawl') {
         setStatusMessage({
           type: 'success',
-          text: `Directly imported ${data.jobs.length} openings from ${atsSlug}'s ${atsPlatform} board!`,
+          text: `Found ${data.foundLinks?.length || 0} candidate job links from career portal.`,
         });
-      } else {
+      } else if (data.job) {
+        onJobsImported([data.job]);
         setStatusMessage({
-          type: 'error',
-          text: `No open roles found matching keyword "${atsKeyword}" on ${atsSlug}'s board.`,
+          type: 'success',
+          text: `Successfully scraped and imported "${data.job.title}" at ${data.job.company}!`,
         });
+        setFirecrawlUrl('');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'ATS scrape failed';
+      const msg = err instanceof Error ? err.message : 'Scraping failed';
       setStatusMessage({ type: 'error', text: msg });
     } finally {
       setLoading(false);
@@ -196,6 +210,8 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
           title: manualTitle,
           company: manualCompany,
           location: manualLocation,
+          salaryInLpa: manualSalary || undefined,
+          salary: manualSalary || undefined,
           url: manualUrl,
           description: manualDescription,
           source: 'manual',
@@ -225,75 +241,72 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      {/* Intro Header */}
-      <div className="bg-gradient-to-r from-indigo-900/10 via-violet-900/10 to-amber-900/10 dark:from-indigo-950/40 dark:via-violet-950/40 dark:to-amber-950/40 border border-indigo-200/50 dark:border-indigo-800/30 rounded-3xl p-6 sm:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-semibold mb-3">
-              <Sparkles className="w-3.5 h-3.5" />
-              Hybrid Harvester Engine
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
-              Harvest Jobs with Firecrawl & Apify
-            </h2>
-            <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1 max-w-xl">
-              Distribute tasks intelligently: Use <strong>Apify</strong> for broad job board sweeps across Google/LinkedIn, and <strong>Firecrawl</strong> to extract deep, structured job markdown directly from career sites.
-            </p>
+    <div className="max-w-4xl mx-auto space-y-6 pb-16">
+      {/* Harvester Banner */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold mb-2">
+            🇮🇳 India Job Discovery Engine
           </div>
-          <button
-            onClick={openSettings}
-            className="self-start md:self-auto text-xs font-semibold px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700/60 transition-colors shadow-xs"
-          >
-            Configure API Keys
-          </button>
+          <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight">
+            Harvest Real Tech Jobs in India
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 max-w-xl">
+            Distribute tasks across direct company ATS boards (Razorpay, Swiggy, BrowserStack, Atlassian), Apify (LinkedIn/Google Jobs India), and Firecrawl for deep career page extraction.
+          </p>
         </div>
+        <button
+          onClick={openSettings}
+          className="self-start sm:self-auto text-xs font-semibold px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors"
+        >
+          API Settings
+        </button>
       </div>
 
-      {/* Source Selector Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-zinc-100 dark:bg-zinc-800/50 p-1.5 rounded-2xl">
-        <button
-          onClick={() => setActiveSource('firecrawl')}
-          className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-            activeSource === 'firecrawl'
-              ? 'bg-white dark:bg-zinc-900 text-orange-600 dark:text-orange-400 shadow-xs'
-              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-          }`}
-        >
-          <Flame className="w-4 h-4 text-orange-500" />
-          <span>Firecrawl</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSource('apify')}
-          className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-            activeSource === 'apify'
-              ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-          }`}
-        >
-          <Bot className="w-4 h-4 text-emerald-500" />
-          <span>Apify Actors</span>
-        </button>
-
+      {/* Tabs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-zinc-100 dark:bg-zinc-800/60 p-1.5 rounded-xl text-xs sm:text-sm font-semibold">
         <button
           onClick={() => setActiveSource('ats')}
-          className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all cursor-pointer ${
             activeSource === 'ats'
-              ? 'bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs'
-              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
           }`}
         >
-          <Globe className="w-4 h-4 text-blue-500" />
+          <Building2 className="w-4 h-4 text-blue-500" />
           <span>Direct ATS (Free)</span>
         </button>
 
         <button
+          onClick={() => setActiveSource('apify')}
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all cursor-pointer ${
+            activeSource === 'apify'
+              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
+          }`}
+        >
+          <Bot className="w-4 h-4 text-emerald-500" />
+          <span>Apify (LinkedIn/Google)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSource('firecrawl')}
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all cursor-pointer ${
+            activeSource === 'firecrawl'
+              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
+          }`}
+        >
+          <Flame className="w-4 h-4 text-orange-500" />
+          <span>Firecrawl Scraper</span>
+        </button>
+
+        <button
           onClick={() => setActiveSource('manual')}
-          className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all cursor-pointer ${
             activeSource === 'manual'
-              ? 'bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs'
-              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
           }`}
         >
           <FileText className="w-4 h-4 text-purple-500" />
@@ -301,28 +314,28 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
         </button>
       </div>
 
-      {/* Auto-Score Checkbox */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+      {/* Auto-Score Banner */}
+      <div className="flex items-center justify-between px-5 py-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
         <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm text-zinc-700 dark:text-zinc-300">
           <input
             type="checkbox"
             checked={autoScore}
             onChange={(e) => setAutoScore(e.target.checked)}
-            className="w-4 h-4 text-indigo-600 rounded border-zinc-300 focus:ring-indigo-500"
+            className="w-4 h-4 text-indigo-600 rounded"
           />
-          <span className="font-medium">
-            Auto-score candidate match with Gemini API on harvest
+          <span className="font-semibold">
+            Auto-score match with Gemini AI immediately upon harvesting
           </span>
         </label>
-        <span className="text-[11px] text-zinc-400 hidden sm:inline">
-          Uses your resume profile
+        <span className="text-xs text-zinc-400 hidden sm:inline">
+          Evaluates against your resume & Indian market criteria
         </span>
       </div>
 
       {/* Status Alert */}
       {statusMessage && (
         <div
-          className={`flex items-center gap-3 p-4 rounded-xl text-sm ${
+          className={`flex items-center gap-3 p-4 rounded-xl text-xs sm:text-sm ${
             statusMessage.type === 'success'
               ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800'
               : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800'
@@ -333,84 +346,110 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
           ) : (
             <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
           )}
-          <p className="flex-1">{statusMessage.text}</p>
+          <p className="flex-1 font-medium">{statusMessage.text}</p>
         </div>
       )}
 
-      {/* TAB 1: Firecrawl */}
-      {activeSource === 'firecrawl' && (
-        <form onSubmit={handleFirecrawlSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+      {/* TAB 1: Direct ATS (Top Indian Startups & Tech Giants) */}
+      {activeSource === 'ats' && (
+        <form onSubmit={handleAtsSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Flame className="w-5 h-5 text-orange-500" />
+              <Building2 className="w-5 h-5 text-blue-500" />
               <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                Firecrawl Clean Scraper & Crawler
+                Direct Indian Tech Public ATS Harvester (Zero API Cost)
               </h3>
             </div>
             <p className="text-xs text-zinc-500">
-              Scrapes any complex career page or job URL, bypasses JS rendering, and returns clean markdown structured with AI.
+              Directly fetches real, active openings from company public career boards with zero scraper fees.
             </p>
           </div>
 
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-              <input
-                type="radio"
-                name="firecrawlMode"
-                value="scrape"
-                checked={firecrawlMode === 'scrape'}
-                onChange={() => setFirecrawlMode('scrape')}
-                className="text-orange-500"
-              />
-              Single Job URL Scrape
-            </label>
-            <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-              <input
-                type="radio"
-                name="firecrawlMode"
-                value="crawl"
-                checked={firecrawlMode === 'crawl'}
-                onChange={() => setFirecrawlMode('crawl')}
-                className="text-orange-500"
-              />
-              Career Page URL Discover / Crawl
-            </label>
+          {/* Quick presets */}
+          <div>
+            <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2 block">
+              1-Click Indian Tech Company Presets:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {INDIAN_TECH_PRESETS.map((item) => (
+                <button
+                  key={item.slug}
+                  type="button"
+                  onClick={() => {
+                    setAtsSlug(item.slug);
+                    setAtsPlatform(item.platform);
+                  }}
+                  className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                    atsSlug === item.slug
+                      ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-bold'
+                      : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
+                  }`}
+                >
+                  <span className="font-semibold">{item.name}</span>
+                  <span className="text-zinc-400 text-[10px] ml-1.5">({item.city})</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-              Target Career or Job Posting URL
-            </label>
-            <input
-              type="url"
-              required
-              placeholder={
-                firecrawlMode === 'scrape'
-                  ? 'https://boards.greenhouse.io/stripe/jobs/... or https://linear.app/careers/engineer'
-                  : 'https://linear.app/careers or https://anthropic.com/careers'
-              }
-              value={firecrawlUrl}
-              onChange={(e) => setFirecrawlUrl(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                ATS Platform
+              </label>
+              <select
+                value={atsPlatform}
+                onChange={(e) => setAtsPlatform(e.target.value as typeof atsPlatform)}
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+              >
+                <option value="greenhouse">Greenhouse (boards-api.greenhouse.io)</option>
+                <option value="lever">Lever (api.lever.co)</option>
+                <option value="ashby">Ashby (api.ashbyhq.com)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                Company Board Slug
+              </label>
+              <input
+                type="text"
+                required
+                value={atsSlug}
+                onChange={(e) => setAtsSlug(e.target.value)}
+                placeholder="e.g. razorpay, cred, swiggy"
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                Role Filter Keyword
+              </label>
+              <input
+                type="text"
+                value={atsKeyword}
+                onChange={(e) => setAtsKeyword(e.target.value)}
+                placeholder="e.g. Engineer, Frontend, Fullstack"
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+              />
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Harvesting with Firecrawl...</span>
+                <span>Harvesting roles from {atsSlug}...</span>
               </>
             ) : (
               <>
-                <Flame className="w-4 h-4" />
-                <span>
-                  {firecrawlMode === 'scrape' ? 'Scrape & Import Job' : 'Crawl Career Openings'}
-                </span>
+                <Globe className="w-4 h-4" />
+                <span>Fetch Active Roles from {atsSlug.toUpperCase()}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -420,20 +459,20 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
 
       {/* TAB 2: Apify */}
       {activeSource === 'apify' && (
-        <form onSubmit={handleApifySubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+        <form onSubmit={handleApifySubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Bot className="w-5 h-5 text-emerald-500" />
               <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                Apify Actor Job Board Harvester
+                Apify Job Search (LinkedIn & Google Jobs India)
               </h3>
             </div>
             <p className="text-xs text-zinc-500">
-              Run cloud actors to scrape job feeds from Google Jobs, LinkedIn, or Indeed into your pipeline.
+              Run cloud scrapers to harvest recent postings across Indian job boards.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
                 Job Board Source
@@ -441,7 +480,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
               <select
                 value={apifyProvider}
                 onChange={(e) => setApifyProvider(e.target.value as typeof apifyProvider)}
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               >
                 <option value="google-jobs">Google Jobs (apify/google-jobs-scraper)</option>
                 <option value="linkedin">LinkedIn Jobs (bebity/linkedin-jobs-scraper)</option>
@@ -459,21 +498,21 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
                 required
                 value={apifyQuery}
                 onChange={(e) => setApifyQuery(e.target.value)}
-                placeholder="e.g. Senior Frontend Engineer React"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                placeholder="e.g. SDE 2 React TypeScript"
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                Location
+                Location in India
               </label>
               <input
                 type="text"
                 value={apifyLocation}
                 onChange={(e) => setApifyLocation(e.target.value)}
-                placeholder="Remote or City, State"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                placeholder="Bengaluru, Pune, Hyderabad, or Remote India"
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
           </div>
@@ -489,26 +528,26 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
                 placeholder="e.g. username/actor-name"
                 value={apifyActorId}
                 onChange={(e) => setApifyActorId(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
           )}
 
           <div className="flex items-center gap-4">
-            <div className="w-36">
+            <div className="w-48">
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                Max Results ({apifyMaxItems})
+                Max Results: <strong>{apifyMaxItems}</strong>
               </label>
               <input
                 type="range"
                 min="3"
-                max="20"
+                max="15"
                 value={apifyMaxItems}
                 onChange={(e) => setApifyMaxItems(Number(e.target.value))}
-                className="w-full accent-emerald-500"
+                className="w-full accent-emerald-600"
               />
             </div>
-            <div className="text-[11px] text-zinc-400 pt-3">
+            <div className="text-xs text-zinc-400 pt-3">
               Keeps Apify credits minimal and fast.
             </div>
           </div>
@@ -516,17 +555,17 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Running Apify Actor... (takes ~30s)</span>
+                <span>Running Apify Actor... (~30s)</span>
               </>
             ) : (
               <>
                 <Bot className="w-4 h-4" />
-                <span>Search & Batch Import Jobs</span>
+                <span>Search & Import Roles from {apifyLocation}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -534,106 +573,74 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
         </form>
       )}
 
-      {/* TAB 3: Direct ATS */}
-      {activeSource === 'ats' && (
-        <form onSubmit={handleAtsSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
+      {/* TAB 3: Firecrawl */}
+      {activeSource === 'firecrawl' && (
+        <form onSubmit={handleFirecrawlSubmit} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Globe className="w-5 h-5 text-blue-500" />
+              <Flame className="w-5 h-5 text-orange-500" />
               <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
-                Direct ATS Board Harvester (Zero API Cost)
+                Firecrawl Deep Career Page Scraper
               </h3>
             </div>
             <p className="text-xs text-zinc-500">
-              Directly queries company public job boards without consuming third-party scraper credits.
+              Scrapes any complex career page or job URL, bypasses JS rendering, and returns clean markdown structured with AI.
             </p>
           </div>
 
-          {/* Quick presets */}
-          <div>
-            <span className="text-xs font-medium text-zinc-500 mb-2 block">Quick Company Presets:</span>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { name: 'Stripe', slug: 'stripe', platform: 'greenhouse' as const },
-                { name: 'Figma', slug: 'figma', platform: 'greenhouse' as const },
-                { name: 'OpenAI', slug: 'openai', platform: 'greenhouse' as const },
-                { name: 'Linear', slug: 'linear', platform: 'ashby' as const },
-                { name: 'Vercel', slug: 'vercel', platform: 'lever' as const },
-                { name: 'Supabase', slug: 'supabase', platform: 'ashby' as const },
-              ].map((item) => (
-                <button
-                  key={item.slug}
-                  type="button"
-                  onClick={() => {
-                    setAtsSlug(item.slug);
-                    setAtsPlatform(item.platform);
-                  }}
-                  className="text-xs px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-zinc-700 dark:text-zinc-300 transition-colors"
-                >
-                  {item.name} ({item.platform})
-                </button>
-              ))}
-            </div>
+          <div className="flex gap-4 text-xs font-semibold">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="firecrawlMode"
+                value="scrape"
+                checked={firecrawlMode === 'scrape'}
+                onChange={() => setFirecrawlMode('scrape')}
+                className="text-orange-500"
+              />
+              Single Job URL Scrape
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="firecrawlMode"
+                value="crawl"
+                checked={firecrawlMode === 'crawl'}
+                onChange={() => setFirecrawlMode('crawl')}
+                className="text-orange-500"
+              />
+              Career Portal Crawl
+            </label>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                ATS Platform
-              </label>
-              <select
-                value={atsPlatform}
-                onChange={(e) => setAtsPlatform(e.target.value as typeof atsPlatform)}
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
-              >
-                <option value="greenhouse">Greenhouse (boards-api.greenhouse.io)</option>
-                <option value="lever">Lever (api.lever.co)</option>
-                <option value="ashby">Ashby (api.ashbyhq.com)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                Company Board Slug
-              </label>
-              <input
-                type="text"
-                required
-                value={atsSlug}
-                onChange={(e) => setAtsSlug(e.target.value)}
-                placeholder="e.g. stripe, openai, linear"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                Role Keyword Filter
-              </label>
-              <input
-                type="text"
-                value={atsKeyword}
-                onChange={(e) => setAtsKeyword(e.target.value)}
-                placeholder="e.g. Engineer, Frontend, AI"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+              Target Job Posting or Career Page URL
+            </label>
+            <input
+              type="url"
+              required
+              placeholder="e.g. https://careers.swiggy.com/job/1234 or https://razorpay.com/jobs"
+              value={firecrawlUrl}
+              onChange={(e) => setFirecrawlUrl(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+            />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Fetching Company Board...</span>
+                <span>Scraping with Firecrawl...</span>
               </>
             ) : (
               <>
-                <Globe className="w-4 h-4" />
-                <span>Fetch Open Roles from {atsSlug.toUpperCase()}</span>
+                <Flame className="w-4 h-4" />
+                <span>Scrape & Import Job</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -652,11 +659,11 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
               </h3>
             </div>
             <p className="text-xs text-zinc-500">
-              Found a job manually? Paste it directly into your tracking pipeline.
+              Found a role on LinkedIn, Instahyre, or Naukri? Paste it directly into your tracking pipeline.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
                 Job Title *
@@ -667,7 +674,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
                 value={manualTitle}
                 onChange={(e) => setManualTitle(e.target.value)}
                 placeholder="Senior Full Stack Engineer"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
             <div>
@@ -679,70 +686,73 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
                 required
                 value={manualCompany}
                 onChange={(e) => setManualCompany(e.target.value)}
-                placeholder="Acme Corp"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                placeholder="e.g. Swiggy, Zepto, CRED"
+                className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                Location
+                Location in India
               </label>
               <input
                 type="text"
                 value={manualLocation}
                 onChange={(e) => setManualLocation(e.target.value)}
-                placeholder="Remote, US or City"
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                placeholder="Bengaluru, Pune, Remote"
+                className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                Application URL
+                Salary (₹ LPA)
+              </label>
+              <input
+                type="text"
+                value={manualSalary}
+                onChange={(e) => setManualSalary(e.target.value)}
+                placeholder="e.g. ₹28 - ₹35 LPA"
+                className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Job Posting URL
               </label>
               <input
                 type="url"
                 value={manualUrl}
                 onChange={(e) => setManualUrl(e.target.value)}
                 placeholder="https://..."
-                className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+                className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-              Job Description / Notes
+              Job Description / Requirements
             </label>
             <textarea
-              rows={4}
+              rows={5}
               value={manualDescription}
               onChange={(e) => setManualDescription(e.target.value)}
-              placeholder="Paste responsibilities, requirements, or tech stack here..."
-              className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
+              placeholder="Paste responsibilities and requirements..."
+              className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <PlusIcon className="w-4 h-4" />
-            <span>Add to Pipeline</span>
+            Add Role to Matched Pipeline
           </button>
         </form>
       )}
     </div>
-  );
-}
-
-function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-    </svg>
   );
 }

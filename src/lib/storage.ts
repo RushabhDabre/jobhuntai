@@ -14,34 +14,58 @@ function ensureDataDir() {
 }
 
 const DEFAULT_PROFILE: UserProfile = {
-  name: 'Alex Developer',
-  email: 'alex.developer@example.com',
-  targetTitles: ['Full Stack Engineer', 'Senior Frontend Engineer', 'AI Application Engineer'],
-  targetLocations: ['San Francisco, CA', 'Remote (US/Global)', 'New York, NY'],
-  preferredRemote: true,
-  yearsOfExperience: 5,
-  minSalary: '$140,000',
+  name: 'Rushabh Dabare',
+  email: 'rushabh.dabare@seaker.ai',
+  phone: '+91 98765 43210',
+  currentLocation: 'Bengaluru, India',
+  preferredLocations: ['Bengaluru', 'Pune', 'Hyderabad', 'Remote (India)'],
+  targetTitles: ['Senior Full Stack Engineer', 'SDE 2 / SDE 3', 'Senior Frontend Engineer', 'AI Engineer'],
+  yearsOfExperience: 4.5,
+  currentCtc: '₹18 LPA',
+  expectedCtc: '₹28 - ₹35 LPA',
+  noticePeriod: '30 Days',
+  preferredWorkMode: 'any',
   skills: [
     'React',
     'Next.js',
     'TypeScript',
     'Node.js',
-    'Tailwind CSS',
     'Python',
-    'Gemini API',
-    'REST & GraphQL',
     'PostgreSQL',
-    'Docker'
+    'Tailwind CSS',
+    'Docker',
+    'Gemini API',
+    'AWS',
+    'System Design',
+    'REST APIs'
   ],
-  resumeText: `Alex Developer
-Experienced Full Stack & AI Applications Engineer with 5+ years building modern web applications.
-Key Experience:
-- Led frontend architecture migration to Next.js 15/React 19 with App Router and Tailwind CSS, improving Core Web Vitals LCP by 40%.
-- Integrated LLMs (Gemini, OpenAI) for automated document summarization, semantic search, and streaming conversational chat features.
-- Developed backend microservices using Node.js, TypeScript, and Python with PostgreSQL and Redis caching.
-- Built automated web scraping pipelines using Firecrawl, Playwright, and Apify actors to harvest real-time market data.
-Education: B.S. in Computer Science.`,
-  bioNotes: 'Looking for fast-paced product teams working on modern web, developer tooling, or AI-powered workflows.',
+  resumeText: `RUSHABH DABARE
+Senior Software / Full Stack Engineer | Bengaluru, India
+rushabh.dabare@seaker.ai | +91 98765 43210 | Notice Period: 30 Days
+
+SUMMARY:
+4.5+ years of experience engineering high-performance web applications, distributed systems, and AI-enabled product workflows. Expertise in React, Next.js, TypeScript, Node.js, and Python.
+
+WORK EXPERIENCE:
+1. Senior Full Stack Engineer (2023 - Present)
+- Architected and shipped scalable microservices and customer dashboards handling 500k+ daily API requests.
+- Integrated LLMs (Gemini, OpenAI) for automated text summarization, candidate extraction, and real-time streaming tools.
+- Reduced core page loading times (LCP) by 45% using Next.js App Router and server-side streaming.
+
+2. Software Development Engineer (2021 - 2023)
+- Built user-facing web portals in React, TypeScript, and Tailwind CSS.
+- Developed backend REST endpoints in Node.js / Express with PostgreSQL and Redis caching.
+- Collaborated in an agile product team to drive key metrics and feature velocity.
+
+EDUCATION:
+B.Tech in Computer Science & Engineering (2017 - 2021)
+
+KEY SKILLS:
+Languages: TypeScript, JavaScript, Python, SQL
+Frontend: React 18/19, Next.js, Tailwind CSS, State Management (Zustand/Redux)
+Backend: Node.js, Express, FastAPI, PostgreSQL, Redis, REST APIs, Microservices
+DevOps & Tools: Docker, Git, CI/CD, AWS, Postman`,
+  bioNotes: 'Looking for high-impact SDE-2 or Senior roles in Bengaluru/Pune/Remote with product-first engineering culture.',
   updatedAt: new Date().toISOString(),
 };
 
@@ -50,117 +74,172 @@ const DEFAULT_SETTINGS: AppSettings = {
   firecrawlApiKey: process.env.FIRECRAWL_API_KEY || '',
   apifyApiToken: process.env.APIFY_API_TOKEN || '',
   defaultGeminiModel: 'gemini-2.5-flash',
+  targetMarket: 'India',
   updatedAt: new Date().toISOString(),
 };
 
-const SAMPLE_JOBS: Job[] = [
+const SAMPLE_JOBS_INDIA: Job[] = [
   {
-    id: 'job-seed-1',
-    title: 'Senior Frontend / Fullstack Engineer',
-    company: 'Linear',
-    location: 'Remote',
-    remoteType: 'remote',
-    salary: '$160,000 - $210,000',
-    url: 'https://linear.app/careers',
-    source: 'firecrawl',
-    description: `We are looking for a Senior Frontend / Fullstack Engineer to craft best-in-class product experiences.
+    id: 'job-india-1',
+    title: 'Senior Software Engineer (Frontend / Fullstack)',
+    company: 'Razorpay',
+    location: 'Bengaluru, Karnataka, India',
+    city: 'Bengaluru',
+    remoteType: 'hybrid',
+    salaryInLpa: '₹32 - ₹42 LPA',
+    salary: '₹32 - ₹42 LPA + ESOPs',
+    experienceRequired: '4 - 7 years',
+    url: 'https://razorpay.com/jobs',
+    source: 'greenhouse',
+    description: `Razorpay is India's leading fintech payments platform. We are seeking a Senior Software Engineer to build resilient, accessible payment checkout experiences and merchant dashboards.
+
 Responsibilities:
-- Build high-performance, keyboard-first web applications using React, TypeScript, and modern CSS.
-- Optimize client-side state synchronization, local-first architectures, and rendering performance.
-- Collaborate with designers and product engineers to ship delightful features with exceptional attention to detail.
+- Build low-latency, resilient web UI using React, TypeScript, and modern state architectures.
+- Scale frontend infrastructure serving millions of transactions across India.
+- Work closely with backend teams, design, and product managers to launch innovative merchant features.
+
 Requirements:
-- 4+ years of professional experience with React and TypeScript.
-- Strong eye for UI craft, micro-interactions, and accessibility.
-- Experience with real-time web applications, state management, and modern browser APIs.`,
+- 4+ years of hands-on experience in modern frontend and web technologies (React, TypeScript).
+- Deep understanding of browser internals, web performance, and responsive interfaces.
+- Experience with payment flows or high-traffic consumer systems is a plus.`,
     requirements: [
-      '4+ years React and TypeScript',
-      'High attention to UI craft and performance',
-      'Local-first / modern web state knowledge'
+      '4+ years React & TypeScript',
+      'Web performance & Core Web Vitals optimization',
+      'Experience with scalable frontend systems'
     ],
     status: 'saved',
-    matchScore: 92,
+    matchScore: 94,
     matchAnalysis: {
-      score: 92,
+      score: 94,
       recommendation: 'Strong Fit',
-      summary: 'Outstanding alignment with your 5 years of React/TypeScript experience, Next.js UI performance work, and strong product craft.',
+      summary: 'Exceptional match! Your 4.5 years of React/TypeScript experience, LCP optimization background, and Bengaluru location strongly align with Razorpay engineering standards.',
       strengths: [
-        '5+ years deep React & TypeScript mastery',
-        'Proven track record optimizing Core Web Vitals and client rendering',
-        'Full alignment on remote work preference'
+        'Direct alignment with 4+ years React and TypeScript tech stack',
+        'Demonstrated Core Web Vitals LCP optimization track record',
+        'Immediate location match in Bengaluru'
       ],
       gaps: [
-        'Linear places strong emphasis on local-first sync engines (Replicache/CRDTs) which is worth highlighting'
+        'Fintech payment protocols and security compliance experience can be highlighted during interview'
       ],
       interviewTalkingPoints: [
-        'Share your Next.js App Router performance optimizations and how you minimized render lag',
-        'Discuss your approach to keyboard navigation and responsive micro-interactions'
+        'Discuss how you handled high throughput API requests and client-side error states',
+        'Highlight your App Router migration and 45% LCP load reduction'
       ],
+      indiaRelevance: {
+        locationFit: 'Matches preferred city (Bengaluru)',
+        salaryFit: 'Within your expected bracket (₹28 - ₹35 LPA vs ₹32 - ₹42 LPA)',
+        noticePeriodFit: '30 Days notice period is widely accepted at Razorpay'
+      },
       evaluatedAt: new Date().toISOString()
     },
-    notes: 'Exciting product! Reach out to engineering team on X/LinkedIn.',
+    notes: 'Razorpay engineering bar is high on JS fundamentals and system design. Reaching out to recruiter on LinkedIn.',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'job-seed-2',
-    title: 'AI Platform Software Engineer',
-    company: 'Anthropic',
-    location: 'San Francisco, CA / Remote',
-    remoteType: 'hybrid',
-    salary: '$180,000 - $240,000',
-    url: 'https://anthropic.com/careers',
-    source: 'firecrawl',
-    description: `Join Anthropic to build user-facing platforms and tooling for frontier AI models.
-Responsibilities:
-- Build internal and developer-facing web interfaces for model evaluation and API orchestration.
-- Connect complex agentic workflows, streaming inference pipelines, and scalable APIs.
-- Work with Python, TypeScript, and modern web application frameworks.
-Requirements:
-- Strong experience with TypeScript, Python, and cloud infrastructure.
-- Experience building developer tools, LLM applications, or data pipelines.`,
-    requirements: ['TypeScript', 'Python', 'LLM orchestration', 'Fullstack API design'],
-    status: 'discovered',
-    matchScore: 88,
-    matchAnalysis: {
-      score: 88,
-      recommendation: 'Strong Fit',
-      summary: 'Great match with your background in AI integration, Python services, and TypeScript web dashboards.',
-      strengths: [
-        'Hands-on LLM application development experience',
-        'Solid dual proficiency in TypeScript and Python',
-        'Background with scraping and data pipelines'
-      ],
-      gaps: [
-        'Hybrid preference noted in San Francisco; check remote flexibility for this specific role'
-      ],
-      interviewTalkingPoints: [
-        'Highlight your experience connecting streaming model responses with responsive frontends',
-        'Talk about handling rate limits, error fallbacks, and agent evaluation'
-      ],
-      evaluatedAt: new Date().toISOString()
-    },
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'job-seed-3',
-    title: 'Full Stack Engineer - Growth & Automation',
-    company: 'Stripe',
-    location: 'Remote',
+    id: 'job-india-2',
+    title: 'SDE 2 - Full Stack Engineer (Growth & AI)',
+    company: 'Swiggy',
+    location: 'Bengaluru / Remote (India)',
+    city: 'Bengaluru',
     remoteType: 'remote',
-    salary: '$170,000 - $220,000',
-    url: 'https://stripe.com/jobs',
-    source: 'apify',
-    description: `Stripe is looking for engineers to accelerate developer onboarding and autonomous growth loops.
-You will build fullstack web platforms, design reliable data pipelines, and integrate AI-assisted customer workflows.
+    salaryInLpa: '₹28 - ₹36 LPA',
+    salary: '₹28 - ₹36 LPA',
+    experienceRequired: '3 - 6 years',
+    url: 'https://careers.swiggy.com',
+    source: 'lever',
+    description: `Swiggy is building consumer tech that powers convenience for millions of Indians every day.
+We are looking for an SDE 2 to join the Growth engineering team.
+
+Responsibilities:
+- Build and maintain high-conversion customer touchpoints on web and app-web views.
+- Integrate automated experiments, feature flags, and AI-driven personalization pipelines.
+- Collaborate with backend engineers on Node.js/Java microservices.
+
 Requirements:
-- 3+ years full stack web development (JavaScript/TypeScript, Ruby, or Python).
-- Passion for API reliability, payment systems, and developer ergonomics.`,
-    requirements: ['3+ years Fullstack', 'APIs & Web apps', 'Growth/Data automation'],
+- 3+ years experience with React, TypeScript, and Node.js.
+- Strong problem-solving skills and experience with high-scale web platforms.`,
+    requirements: ['React', 'TypeScript', 'Node.js', 'System Design basics'],
+    status: 'discovered',
+    matchScore: 90,
+    matchAnalysis: {
+      score: 90,
+      recommendation: 'Strong Fit',
+      summary: 'High relevance for your experience with fullstack Node/React stacks and AI application experiments.',
+      strengths: [
+        'Fullstack JavaScript/TypeScript mastery',
+        'Strong alignment with target CTC bracket (₹28 - ₹36 LPA)',
+        'Remote India flexibility'
+      ],
+      gaps: [
+        'Familiarity with large-scale A/B testing infrastructure'
+      ],
+      interviewTalkingPoints: [
+        'Explain how you integrated LLMs into existing web services',
+        'Walk through your microservice architecture with Node and PostgreSQL'
+      ],
+      indiaRelevance: {
+        locationFit: 'Offers Remote (India) or Bengaluru office',
+        salaryFit: 'Perfect match for ₹28 - ₹35 LPA expected CTC',
+        noticePeriodFit: '30 days notice is accepted'
+      },
+      evaluatedAt: new Date().toISOString()
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'job-india-3',
+    title: 'Senior Software Engineer - Cloud & Web Platforms',
+    company: 'Atlassian India',
+    location: 'Bengaluru, India / Remote (Work from Anywhere in India)',
+    city: 'Bengaluru',
+    remoteType: 'remote',
+    salaryInLpa: '₹40 - ₹52 LPA',
+    salary: '₹40 - ₹52 LPA + Stocks',
+    experienceRequired: '4 - 8 years',
+    url: 'https://www.atlassian.com/company/careers',
+    source: 'firecrawl',
+    description: `Atlassian fuels team collaboration across the world (Jira, Confluence, Trello).
+Atlassian India operates with Team Anywhere policy (work anywhere in India).
+
+Role:
+- Build robust developer interfaces and cloud features using React, TypeScript, GraphQL, and modern web standards.
+- Champion accessibility, performance, and cross-browser reliability.
+- Participate in distributed architectural reviews and code mentorship.
+
+Requirements:
+- 4+ years of production web engineering experience.
+- Deep expertise in JavaScript/TypeScript, modern frontend patterns, and distributed web services.`,
+    requirements: ['React & TypeScript', 'Team Anywhere in India', '4+ years SDE experience'],
     status: 'applied',
-    matchScore: 85,
-    appliedDate: '2026-10-24',
-    notes: 'Submitted application through employee referral link.',
+    matchScore: 89,
+    appliedDate: '2026-10-25',
+    notes: 'Submitted via employee referral. Team Anywhere in India policy is top tier.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'job-india-4',
+    title: 'Frontend Engineer 2',
+    company: 'BrowserStack',
+    location: 'Mumbai / Remote (India)',
+    city: 'Mumbai',
+    remoteType: 'remote',
+    salaryInLpa: '₹22 - ₹30 LPA',
+    salary: '₹22 - ₹30 LPA',
+    experienceRequired: '3 - 6 years',
+    url: 'https://www.browserstack.com/careers',
+    source: 'ashby',
+    description: `BrowserStack is the world's leading software testing platform, built proudly from India.
+Join our core product team to craft high-speed developer testing dashboards and interactive devtools.
+
+Requirements:
+- 3+ years experience building complex single page applications in React/TypeScript.
+- Passion for developer tools, canvas/DOM performance, and web standards.`,
+    requirements: ['React', 'TypeScript', 'DevTools / Testing mindset'],
+    status: 'discovered',
+    matchScore: 86,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   }
@@ -169,15 +248,20 @@ Requirements:
 export function getJobs(): Job[] {
   ensureDataDir();
   if (!fs.existsSync(JOBS_FILE)) {
-    saveJobs(SAMPLE_JOBS);
-    return SAMPLE_JOBS;
+    saveJobs(SAMPLE_JOBS_INDIA);
+    return SAMPLE_JOBS_INDIA;
   }
   try {
     const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      saveJobs(SAMPLE_JOBS_INDIA);
+      return SAMPLE_JOBS_INDIA;
+    }
+    return parsed;
   } catch (err) {
     console.error('Error reading jobs file, resetting to sample jobs:', err);
-    return SAMPLE_JOBS;
+    return SAMPLE_JOBS_INDIA;
   }
 }
 
@@ -225,16 +309,31 @@ export function getUserProfile(): UserProfile {
   }
   try {
     const raw = fs.readFileSync(PROFILE_FILE, 'utf-8');
-    return JSON.parse(raw);
+    return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
   } catch (err) {
     console.error('Error reading profile file:', err);
     return DEFAULT_PROFILE;
   }
 }
 
-export function saveUserProfile(profile: UserProfile): void {
+export function saveUserProfile(profile: Partial<UserProfile>): UserProfile {
   ensureDataDir();
-  fs.writeFileSync(PROFILE_FILE, JSON.stringify(profile, null, 2), 'utf-8');
+  let baseProfile = DEFAULT_PROFILE;
+  if (fs.existsSync(PROFILE_FILE)) {
+    try {
+      const raw = fs.readFileSync(PROFILE_FILE, 'utf-8');
+      baseProfile = { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    } catch {
+      baseProfile = DEFAULT_PROFILE;
+    }
+  }
+  const updated: UserProfile = {
+    ...baseProfile,
+    ...profile,
+    updatedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(PROFILE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+  return updated;
 }
 
 export function getAppSettings(): AppSettings {
@@ -249,7 +348,6 @@ export function getAppSettings(): AppSettings {
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      // fallback to env vars if not set in file
       geminiApiKey: parsed.geminiApiKey || process.env.GEMINI_API_KEY || '',
       firecrawlApiKey: parsed.firecrawlApiKey || process.env.FIRECRAWL_API_KEY || '',
       apifyApiToken: parsed.apifyApiToken || process.env.APIFY_API_TOKEN || '',
