@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { scrapeJobWithFirecrawl, crawlCareerPageWithFirecrawl } from '@/lib/services/firecrawl';
 import { upsertJob, getUserProfile } from '@/lib/storage';
 import { matchJobWithResume } from '@/lib/services/gemini';
+import { parseApiError } from '@/lib/apiErrorHandler';
 import { Job } from '@/types/job';
 
 export async function POST(req: Request) {
@@ -69,7 +70,11 @@ export async function POST(req: Request) {
     const saved = upsertJob(newJob);
     return NextResponse.json({ success: true, job: saved });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Firecrawl harvesting failed';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const formatted = parseApiError(error, 'Firecrawl');
+    return NextResponse.json({
+      success: false,
+      error: formatted.message,
+      formattedError: formatted,
+    }, { status: 200 });
   }
 }

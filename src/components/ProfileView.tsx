@@ -101,6 +101,13 @@ export default function ProfileView() {
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.formattedError) {
+          setUploadMessage({
+            type: 'error',
+            text: `⚡ Out of tokens for ${data.formattedError.service}. Please wait until ${data.formattedError.resetTime} for free tier replenishment, or update your API key in Settings.`,
+          });
+          return;
+        }
         throw new Error(data.error || 'Failed to upload and parse resume');
       }
 

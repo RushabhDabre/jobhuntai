@@ -39,6 +39,11 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
   const [localStatus, setLocalStatus] = useState<JobStatus>('discovered');
   const [localAppliedDate, setLocalAppliedDate] = useState('');
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
+  const [tokenLimitNotice, setTokenLimitNotice] = useState<{
+    resetTime: string;
+    message: string;
+    service: string;
+  } | null>(null);
 
   // Sync state on job change and handle native dialog showModal
   useEffect(() => {
@@ -48,6 +53,8 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
       setLocalStatus(job.status || 'discovered');
       setLocalAppliedDate(job.appliedDate || '');
       setPitchContent(job.coldPitch || job.coverLetter || '');
+      setErrorNotice(null);
+      setTokenLimitNotice(null);
       if (dialog && !dialog.open) {
         dialog.showModal();
       }
@@ -62,12 +69,21 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
   const handleEvaluateMatch = async () => {
     setEvaluating(true);
     setErrorNotice(null);
+    setTokenLimitNotice(null);
     try {
       const res = await fetch(`/api/jobs/${job.id}/match`, {
         method: 'POST',
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.formattedError) {
+          setTokenLimitNotice({
+            resetTime: data.formattedError.resetTime,
+            message: data.formattedError.message,
+            service: data.formattedError.service,
+          });
+          return;
+        }
         throw new Error(data.error || 'Evaluation failed');
       }
       onUpdateJob(data.job);
@@ -83,6 +99,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
   const handleGeneratePitch = async () => {
     setGeneratingPitch(true);
     setErrorNotice(null);
+    setTokenLimitNotice(null);
     try {
       const res = await fetch(`/api/jobs/${job.id}/pitch`, {
         method: 'POST',
@@ -91,6 +108,14 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.formattedError) {
+          setTokenLimitNotice({
+            resetTime: data.formattedError.resetTime,
+            message: data.formattedError.message,
+            service: data.formattedError.service,
+          });
+          return;
+        }
         throw new Error(data.error || 'Pitch generation failed');
       }
       setPitchContent(data.pitch);
@@ -257,6 +282,28 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 sm:p-7 space-y-6">
+          {tokenLimitNotice && (
+            <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-start gap-3">
+              <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                    ⚡ Out of API Tokens ({tokenLimitNotice.service})
+                  </h4>
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-300">
+                    Replenishes at {tokenLimitNotice.resetTime}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                  {tokenLimitNotice.message}
+                </p>
+                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+                  You can wait for the cooldown or enter another API key in Settings (⚙️).
+                </p>
+              </div>
+            </div>
+          )}
+
           {errorNotice && (
             <div className="flex items-center gap-2 p-3.5 bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-medium">
               <AlertCircle className="w-4 h-4 shrink-0" />

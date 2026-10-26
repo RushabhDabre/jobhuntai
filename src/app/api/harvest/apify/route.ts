@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { searchJobsWithApify } from '@/lib/services/apify';
 import { upsertJob, getUserProfile } from '@/lib/storage';
 import { matchJobWithResume } from '@/lib/services/gemini';
+import { parseApiError } from '@/lib/apiErrorHandler';
 import { Job } from '@/types/job';
 
 export async function POST(req: Request) {
@@ -78,7 +79,11 @@ export async function POST(req: Request) {
       jobs: savedJobs,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Apify harvesting failed';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const formatted = parseApiError(error, 'Apify');
+    return NextResponse.json({
+      success: false,
+      error: formatted.message,
+      formattedError: formatted,
+    }, { status: 200 });
   }
 }

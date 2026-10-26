@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getJobById, getUserProfile, upsertJob } from '@/lib/storage';
 import { generatePitch } from '@/lib/services/gemini';
+import { parseApiError } from '@/lib/apiErrorHandler';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -15,7 +16,7 @@ export async function POST(req: Request, context: RouteContext) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const pitchType = body.pitchType || 'cover_letter';
+    const pitchType = body.pitchType || 'linkedin_dm';
     const profile = getUserProfile();
 
     const pitchText = await generatePitch(
@@ -44,7 +45,14 @@ export async function POST(req: Request, context: RouteContext) {
 
     return NextResponse.json({ success: true, pitch: pitchText, pitchType, job: updated });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error generating pitch';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const formatted = parseApiError(error, 'Gemini');
+    return NextResponse.json(
+      {
+        success: false,
+        error: formatted.message,
+        formattedError: formatted,
+      },
+      { status: 200 }
+    );
   }
 }

@@ -129,6 +129,13 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.formattedError) {
+          setStatusMessage({
+            type: 'error',
+            text: `⚡ Out of tokens for ${data.formattedError.service}. Please wait until ${data.formattedError.resetTime} for quota replenishment.`,
+          });
+          return;
+        }
         throw new Error(data.error || 'Apify search failed');
       }
 
@@ -171,6 +178,13 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.formattedError) {
+          setStatusMessage({
+            type: 'error',
+            text: `⚡ Out of tokens for ${data.formattedError.service}. Please wait until ${data.formattedError.resetTime} for quota replenishment.`,
+          });
+          return;
+        }
         throw new Error(data.error || 'Firecrawl failed');
       }
 

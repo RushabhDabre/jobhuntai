@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { getAppSettings, saveUserProfile } from '@/lib/storage';
+import { parseApiError } from '@/lib/apiErrorHandler';
 
 export async function POST(req: Request) {
   try {
@@ -15,13 +16,28 @@ export async function POST(req: Request) {
     const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
+      const now = new Date();
+      const resetTimeStr = new Date(now.getTime() + 15 * 60 * 1000).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
       return NextResponse.json(
         {
           success: false,
-          error:
-            'Gemini API key is required to parse resumes. Please add it in Settings (Gear Icon) first.',
+          error: 'Gemini API key is missing. Please configure it in Settings (Gear Icon).',
+          formattedError: {
+            isRateLimited: false,
+            isExpired: true,
+            service: 'Gemini',
+            title: 'API Key Missing',
+            message: 'A Gemini API key is needed to parse resumes. Free keys are available from Google AI Studio.',
+            resetTime: resetTimeStr,
+            resetInMinutes: 0,
+            suggestion: 'Click Settings in the top-right to add your key.',
+            rawMessage: 'Missing API key',
+          },
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 
@@ -51,7 +67,7 @@ Respond strictly in valid JSON matching this schema:
   "name": "Full Name",
   "email": "email address or empty string",
   "phone": "phone number or empty string",
-  "currentLocation": "City, India (e.g. Bengaluru, Pune, Hyderabad, Delhi NCR, Mumbai)",
+  "currentLocation": "City, India (e.g. Pune, Mumbai, Hyderabad, Bengaluru, Delhi NCR)",
   "yearsOfExperience": number (total years of professional software/tech experience as float or int),
   "targetTitles": ["Target Title 1", "Target Title 2", ...],
   "skills": ["Skill 1", "Skill 2", "Skill 3", ...],
@@ -72,7 +88,7 @@ Respond strictly in valid JSON matching this schema:
   "name": "Full Name",
   "email": "email address or empty string",
   "phone": "phone number or empty string",
-  "currentLocation": "City, India (e.g. Bengaluru, Pune, Hyderabad, Delhi NCR, Mumbai)",
+  "currentLocation": "City, India (e.g. Pune, Mumbai, Hyderabad, Bengaluru, Delhi NCR)",
   "yearsOfExperience": number (total years of professional software/tech experience),
   "targetTitles": ["Target Title 1", "Target Title 2", ...],
   "skills": ["Skill 1", "Skill 2", "Skill 3", ...],
@@ -96,11 +112,11 @@ Respond strictly in valid JSON matching this schema:
       name: parsed.name || 'Candidate',
       email: parsed.email || undefined,
       phone: parsed.phone || undefined,
-      currentLocation: parsed.currentLocation || 'Bengaluru, India',
+      currentLocation: parsed.currentLocation || 'Pune, India',
       yearsOfExperience: Number(parsed.yearsOfExperience) || 3,
       targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
         ? parsed.targetTitles
-        : ['Full Stack Engineer', 'SDE 2'],
+        : ['Software Developer', 'React Developer'],
       skills: Array.isArray(parsed.skills) && parsed.skills.length > 0 ? parsed.skills : [],
       resumeText: parsed.cleanResumeMarkdown || buffer.toString('utf-8', 0, 3000),
       resumeFileName: file.name,
@@ -113,8 +129,11 @@ Respond strictly in valid JSON matching this schema:
       message: `Successfully parsed and synced resume from ${file.name}`,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to parse resume file';
-    console.error('Resume upload error:', error);
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const formatted = parseApiError(error, 'Gemini');
+    return NextResponse.json({
+      success: false,
+      error: formatted.message,
+      formattedError: formatted,
+    }, { status: 200 });
   }
 }

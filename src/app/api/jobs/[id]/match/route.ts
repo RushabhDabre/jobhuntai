@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getJobById, getUserProfile, upsertJob } from '@/lib/storage';
 import { matchJobWithResume } from '@/lib/services/gemini';
+import { parseApiError } from '@/lib/apiErrorHandler';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -24,6 +25,8 @@ export async function POST(req: Request, context: RouteContext) {
         location: job.location,
         description: job.description,
         requirements: job.requirements,
+        salary: job.salary,
+        salaryInLpa: job.salaryInLpa,
       },
       profile,
       body.apiKey
@@ -38,7 +41,14 @@ export async function POST(req: Request, context: RouteContext) {
 
     return NextResponse.json({ success: true, job: updated, analysis });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error analyzing job match';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    const formatted = parseApiError(error, 'Gemini');
+    return NextResponse.json(
+      {
+        success: false,
+        error: formatted.message,
+        formattedError: formatted,
+      },
+      { status: 200 } // Return 200 with structured rate-limit/token state so UI displays countdown gracefully
+    );
   }
 }
