@@ -1,0 +1,32 @@
+{
+  "name": "Alex Developer",
+  "email": "alex.developer@example.com",
+  "targetTitles": [
+    "Full Stack Engineer",
+    "Senior Frontend Engineer",
+    "AI Application Engineer"
+  ],
+  "targetLocations": [
+    "San Francisco, CA",
+    "Remote (US/Global)",
+    "New York, NY"
+  ],
+  "preferredRemote": true,
+  "yearsOfExperience": 5,
+  "minSalary": "$140,000",
+  "skills": [
+    "React",
+    "Next.js",
+    "TypeScript",
+    "Node.js",
+    "Tailwind CSS",
+    "Python",
+    "Gemini API",
+    "REST & GraphQL",
+    "PostgreSQL",
+    "Docker"
+  ],
+  "resumeText": "Alex Developer\nExperienced Full Stack & AI Applications Engineer with 5+ years building modern web applications.\nKey Experience:\n- Led frontend architecture migration to Next.js 15/React 19 with App Router and Tailwind CSS, improving Core Web Vitals LCP by 40%.\n- Integrated LLMs (Gemini, OpenAI) for automated document summarization, semantic search, and streaming conversational chat features.\n- Developed backend microservices using Node.js, TypeScript, and Python with PostgreSQL and Redis caching.\n- Built automated web scraping pipelines using Firecrawl, Playwright, and Apify actors to harvest real-time market data.\nEducation: B.S. in Computer Science.",
+  "bioNotes": "Looking for fast-paced product teams working on modern web, developer tooling, or AI-powered workflows.",
+  "updatedAt": "2026-10-26T12:06:14.914Z"
+}
