@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { getAppSettings, saveUserProfile } from '@/lib/storage';
+import { getAppSettings, getUserProfile, saveUserProfile } from '@/lib/storage';
 import { parseApiError } from '@/lib/apiErrorHandler';
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
+    const userId = (formData.get('userId') as string) || req.headers.get('x-user-id') || undefined;
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
     }
 
     const settings = await getAppSettings();
-    const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    const userProfile = userId ? await getUserProfile(userId) : null;
+    const apiKey = userProfile?.geminiApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
       const now = new Date();
@@ -48,54 +50,34 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(arrayBuffer);
     const mimeType = file.type || 'application/pdf';
 
-    let promptContents: unknown[];
+    const systemPrompt = `You are an expert HR Tech recruiter and ATS resume parser specializing in the Indian software engineering market (Pune, Mumbai, Hyderabad, Bengaluru, Gurgaon).
+Extract all key profile data from the uploaded resume file accurately into strict JSON with the following structure:
+{
+  "name": "Candidate Full Name",
+  "email": "Email address if present",
+  "phone": "Phone number if present",
+  "currentLocation": "City and State if present (e.g. Pune, Maharashtra)",
+  "yearsOfExperience": 3,
+  "targetTitles": ["Software Developer", "Frontend Developer", "React Developer"],
+  "skills": ["React", "JavaScript", "TypeScript", "Node.js", "Java", "SQL"],
+  "currentCtc": "₹X LPA if mentioned or empty string",
+  "expectedCtc": "₹Y LPA if mentioned or empty string",
+  "noticePeriod": "Immediate Joiner / 15 Days / 30 Days / 60 Days / 90 Days",
+  "cleanResumeMarkdown": "Clean markdown summary of candidate work experience, key achievements, and technologies used."
+}
+Be precise. If experience years are not explicitly stated, calculate from first job to present.`;
 
-    if (mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-      const base64Data = buffer.toString('base64');
-      promptContents = [
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: 'application/pdf',
-          },
+    const promptContents = [
+      {
+        text: systemPrompt,
+      },
+      {
+        inlineData: {
+          mimeType,
+          data: buffer.toString('base64'),
         },
-        `You are an expert technical recruiter analyzing a candidate's resume for the Indian tech industry.
-Extract and structure the candidate's profile into JSON.
-
-Respond strictly in valid JSON matching this schema:
-{
-  "name": "Full Name",
-  "email": "email address or empty string",
-  "phone": "phone number or empty string",
-  "currentLocation": "City, India (e.g. Pune, Mumbai, Hyderabad, Bengaluru, Delhi NCR)",
-  "yearsOfExperience": number (total years of professional software/tech experience as float or int),
-  "targetTitles": ["Target Title 1", "Target Title 2", ...],
-  "skills": ["Skill 1", "Skill 2", "Skill 3", ...],
-  "cleanResumeMarkdown": "Full, well-formatted markdown transcription of this resume including Summary, Work Experience, Education, Projects, and Skills."
-}`,
-      ];
-    } else {
-      // Plain text or markdown
-      const textContent = buffer.toString('utf-8');
-      promptContents = [
-        `You are an expert technical recruiter analyzing a candidate's resume for the Indian tech industry.
-Extract and structure the candidate's profile into JSON from this text:
-
-${textContent.slice(0, 8000)}
-
-Respond strictly in valid JSON matching this schema:
-{
-  "name": "Full Name",
-  "email": "email address or empty string",
-  "phone": "phone number or empty string",
-  "currentLocation": "City, India (e.g. Pune, Mumbai, Hyderabad, Bengaluru, Delhi NCR)",
-  "yearsOfExperience": number (total years of professional software/tech experience),
-  "targetTitles": ["Target Title 1", "Target Title 2", ...],
-  "skills": ["Skill 1", "Skill 2", "Skill 3", ...],
-  "cleanResumeMarkdown": "Clean markdown representation of the resume"
-}`,
-      ];
-    }
+      },
+    ];
 
     const response = await client.models.generateContent({
       model,
@@ -108,20 +90,23 @@ Respond strictly in valid JSON matching this schema:
 
     const parsed = JSON.parse(response.text || '{}');
 
-    const updatedProfile = await saveUserProfile({
-      name: parsed.name || 'Candidate',
-      email: parsed.email || undefined,
-      phone: parsed.phone || undefined,
-      currentLocation: parsed.currentLocation || 'Pune, India',
-      yearsOfExperience: Number(parsed.yearsOfExperience) || 3,
-      targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
-        ? parsed.targetTitles
-        : ['Software Developer', 'React Developer'],
-      skills: Array.isArray(parsed.skills) && parsed.skills.length > 0 ? parsed.skills : [],
-      resumeText: parsed.cleanResumeMarkdown || buffer.toString('utf-8', 0, 3000),
-      resumeFileName: file.name,
-      updatedAt: new Date().toISOString(),
-    });
+    const updatedProfile = await saveUserProfile(
+      {
+        name: parsed.name || userProfile?.name || 'Candidate',
+        email: parsed.email || userProfile?.email || undefined,
+        phone: parsed.phone || userProfile?.phone || undefined,
+        currentLocation: parsed.currentLocation || userProfile?.currentLocation || 'Pune, India',
+        yearsOfExperience: Number(parsed.yearsOfExperience) || userProfile?.yearsOfExperience || 2,
+        targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
+          ? parsed.targetTitles
+          : userProfile?.targetTitles || ['Software Developer', 'React Developer'],
+        skills: Array.isArray(parsed.skills) && parsed.skills.length > 0 ? parsed.skills : userProfile?.skills || [],
+        resumeText: parsed.cleanResumeMarkdown || buffer.toString('utf-8', 0, 3000),
+        resumeFileName: file.name,
+        updatedAt: new Date().toISOString(),
+      },
+      userId
+    );
 
     return NextResponse.json({
       success: true,

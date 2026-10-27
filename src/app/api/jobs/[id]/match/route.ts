@@ -16,7 +16,10 @@ export async function POST(req: Request, context: RouteContext) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const profile = await getUserProfile();
+    const userId = req.headers.get('x-user-id') || body.userId || undefined;
+    const profile = await getUserProfile(userId);
+
+    const apiKey = body.apiKey || profile.geminiApiKey;
 
     const analysis = await matchJobWithResume(
       {
@@ -29,7 +32,7 @@ export async function POST(req: Request, context: RouteContext) {
         salaryInLpa: job.salaryInLpa,
       },
       profile,
-      body.apiKey
+      apiKey
     );
 
     const updated = await upsertJob({
@@ -37,7 +40,7 @@ export async function POST(req: Request, context: RouteContext) {
       matchScore: analysis.score,
       matchAnalysis: analysis,
       updatedAt: new Date().toISOString(),
-    });
+    }, userId);
 
     return NextResponse.json({ success: true, job: updated, analysis });
   } catch (error: unknown) {
@@ -48,7 +51,7 @@ export async function POST(req: Request, context: RouteContext) {
         error: formatted.message,
         formattedError: formatted,
       },
-      { status: 200 } // Return 200 with structured rate-limit/token state so UI displays countdown gracefully
+      { status: 200 }
     );
   }
 }

@@ -37,6 +37,7 @@ export function getStorageMode(): 'cloudflare-d1' | 'supabase' | 'local' {
 }
 
 const DEFAULT_PROFILE: UserProfile = {
+  id: 'default_user',
   name: 'Rushabh Dabare',
   email: 'rushabhdabare2001@gmail.com',
   phone: '9067015129',
@@ -86,6 +87,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 function jobFromDb(row: any): Job {
   return {
     id: row.id,
+    userId: row.user_id || undefined,
     title: row.title,
     company: row.company,
     location: row.location || 'Remote',
@@ -115,9 +117,10 @@ function jobFromDb(row: any): Job {
   };
 }
 
-function jobToDb(job: Job) {
+function jobToDb(job: Job, userId?: string) {
   return {
     id: job.id,
+    user_id: job.userId || userId || 'default_user',
     title: job.title,
     company: job.company,
     location: job.location,
@@ -150,6 +153,8 @@ function jobToDb(job: Job) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function profileFromDb(row: any): UserProfile {
   return {
+    id: row.id || 'default_user',
+    userId: row.id || 'default_user',
     name: row.name || DEFAULT_PROFILE.name,
     email: row.email || undefined,
     phone: row.phone || undefined,
@@ -165,15 +170,17 @@ function profileFromDb(row: any): UserProfile {
     skills: Array.isArray(row.skills) ? row.skills : DEFAULT_PROFILE.skills,
     resumeText: row.resume_text || '',
     resumeFileName: row.resume_file_name || undefined,
+    geminiApiKey: row.gemini_api_key || undefined,
     hasCompletedQuickSetup: Boolean(row.has_completed_quick_setup),
     bioNotes: row.bio_notes || undefined,
     updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
-function profileToDb(p: UserProfile) {
+function profileToDb(p: UserProfile, userId?: string) {
+  const targetId = userId || p.email || p.id || 'default_user';
   return {
-    id: 'default_user',
+    id: targetId,
     name: p.name,
     email: p.email,
     phone: p.phone,
@@ -189,6 +196,7 @@ function profileToDb(p: UserProfile) {
     skills: p.skills || [],
     resume_text: p.resumeText || '',
     resume_file_name: p.resumeFileName,
+    gemini_api_key: p.geminiApiKey || null,
     has_completed_quick_setup: p.hasCompletedQuickSetup,
     bio_notes: p.bioNotes,
     updated_at: new Date().toISOString(),
@@ -198,11 +206,11 @@ function profileToDb(p: UserProfile) {
 // ==========================================
 // JOBS API
 // ==========================================
-export async function getJobs(): Promise<Job[]> {
+export async function getJobs(userId?: string): Promise<Job[]> {
   // 1. First Tier: Cloudflare D1 Serverless Database
   if (isCloudflareD1Configured()) {
     try {
-      const d1Jobs = await d1GetJobs();
+      const d1Jobs = await d1GetJobs(userId);
       if (Array.isArray(d1Jobs) && d1Jobs.length > 0) {
         return d1Jobs;
       }
@@ -215,10 +223,11 @@ export async function getJobs(): Promise<Job[]> {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('posted_at', { ascending: false });
+      let query = supabase.from('jobs').select('*').order('posted_at', { ascending: false });
+      if (userId) {
+        query = query.or(`user_id.eq.${userId},user_id.eq.default_user`);
+      }
+      const { data, error } = await query;
 
       if (!error && Array.isArray(data) && data.length > 0) {
         return data.map(jobFromDb);
@@ -235,18 +244,20 @@ export async function getJobs(): Promise<Job[]> {
   }
   try {
     const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: Job[] = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    if (!userId) return parsed;
+    return parsed.filter((j) => !j.userId || j.userId === userId || j.userId === 'default_user');
   } catch {
     return [];
   }
 }
 
-export async function saveJobs(jobs: Job[]): Promise<void> {
+export async function saveJobs(jobs: Job[], userId?: string): Promise<void> {
   // 1. Cloudflare D1
   if (isCloudflareD1Configured()) {
     try {
-      await d1SaveJobs(jobs);
+      await d1SaveJobs(jobs, userId);
     } catch (err) {
       console.warn('Cloudflare D1 saveJobs failed:', err);
     }
@@ -256,7 +267,7 @@ export async function saveJobs(jobs: Job[]): Promise<void> {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const rows = jobs.map(jobToDb);
+      const rows = jobs.map((j) => jobToDb(j, userId));
       await supabase.from('jobs').upsert(rows);
     } catch (err) {
       console.warn('Supabase saveJobs failed:', err);
@@ -305,10 +316,11 @@ export async function getJobById(id: string): Promise<Job | undefined> {
   return jobs.find((j) => j.id === id);
 }
 
-export async function upsertJob(job: Job): Promise<Job> {
+export async function upsertJob(job: Job, userId?: string): Promise<Job> {
   const nowStr = new Date().toISOString();
   const normalizedJob: Job = {
     ...job,
+    userId: job.userId || userId || 'default_user',
     postedAt: job.postedAt || nowStr,
     createdAt: job.createdAt || nowStr,
     updatedAt: nowStr,
@@ -317,7 +329,7 @@ export async function upsertJob(job: Job): Promise<Job> {
   // 1. Cloudflare D1
   if (isCloudflareD1Configured()) {
     try {
-      await d1UpsertJob(normalizedJob);
+      await d1UpsertJob(normalizedJob, userId);
     } catch (err) {
       console.warn('Cloudflare D1 upsertJob failed:', err);
     }
@@ -327,7 +339,7 @@ export async function upsertJob(job: Job): Promise<Job> {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const row = jobToDb(normalizedJob);
+      const row = jobToDb(normalizedJob, userId);
       await supabase.from('jobs').upsert(row);
     } catch (err) {
       console.warn('Supabase upsertJob failed:', err);
@@ -408,11 +420,13 @@ export async function deleteJob(id: string): Promise<boolean> {
 // ==========================================
 // PROFILE API
 // ==========================================
-export async function getUserProfile(): Promise<UserProfile> {
+export async function getUserProfile(userId?: string): Promise<UserProfile> {
+  const targetId = userId || 'default_user';
+
   // 1. Cloudflare D1
   if (isCloudflareD1Configured()) {
     try {
-      const profile = await d1GetUserProfile();
+      const profile = await d1GetUserProfile(targetId);
       if (profile) return profile;
     } catch (err) {
       console.warn('Cloudflare D1 getUserProfile failed, falling back:', err);
@@ -426,7 +440,7 @@ export async function getUserProfile(): Promise<UserProfile> {
       const { data, error } = await supabase
         .from('user_profile')
         .select('*')
-        .eq('id', 'default_user')
+        .eq('id', targetId)
         .single();
       if (!error && data) {
         return profileFromDb(data);
@@ -439,28 +453,32 @@ export async function getUserProfile(): Promise<UserProfile> {
   // 3. Local JSON fallback
   ensureDataDir();
   if (!fs.existsSync(PROFILE_FILE)) {
-    return DEFAULT_PROFILE;
+    return { ...DEFAULT_PROFILE, id: targetId, userId: targetId };
   }
   try {
     const raw = fs.readFileSync(PROFILE_FILE, 'utf-8');
-    return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_PROFILE, ...parsed, id: targetId, userId: targetId };
   } catch {
-    return DEFAULT_PROFILE;
+    return { ...DEFAULT_PROFILE, id: targetId, userId: targetId };
   }
 }
 
-export async function saveUserProfile(profile: Partial<UserProfile>): Promise<UserProfile> {
-  const current = await getUserProfile();
+export async function saveUserProfile(profile: Partial<UserProfile>, userId?: string): Promise<UserProfile> {
+  const targetId = userId || profile.email || profile.id || 'default_user';
+  const current = await getUserProfile(targetId);
   const updated: UserProfile = {
     ...current,
     ...profile,
+    id: targetId,
+    userId: targetId,
     updatedAt: new Date().toISOString(),
   };
 
   // 1. Cloudflare D1
   if (isCloudflareD1Configured()) {
     try {
-      await d1SaveUserProfile(updated);
+      await d1SaveUserProfile(updated, targetId);
     } catch (err) {
       console.warn('Cloudflare D1 saveUserProfile failed:', err);
     }
@@ -470,7 +488,7 @@ export async function saveUserProfile(profile: Partial<UserProfile>): Promise<Us
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const row = profileToDb(updated);
+      const row = profileToDb(updated, targetId);
       await supabase.from('user_profile').upsert(row);
     } catch (err) {
       console.warn('Supabase saveUserProfile failed:', err);

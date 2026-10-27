@@ -35,6 +35,7 @@ export interface MatchAnalysis {
 
 export interface Job {
   id: string;
+  userId?: string;
   title: string;
   company: string;
   location: string;
@@ -64,6 +65,8 @@ export interface Job {
 }
 
 export interface UserProfile {
+  id?: string;
+  userId?: string;
   name: string;
   email?: string;
   phone?: string;
@@ -79,6 +82,7 @@ export interface UserProfile {
   skills: string[];
   resumeText: string;
   resumeFileName?: string;
+  geminiApiKey?: string;
   hasCompletedQuickSetup?: boolean;
   bioNotes?: string;
   updatedAt: string;

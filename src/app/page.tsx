@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Navbar from '@/components/Navbar';
 import SmartFeedView from '@/components/SmartFeedView';
 import PipelineBoard from '@/components/PipelineBoard';
@@ -10,7 +10,10 @@ import JobDetailModal from '@/components/JobDetailModal';
 import SettingsModal from '@/components/SettingsModal';
 import AddJobModal from '@/components/AddJobModal';
 import QuickStartModal from '@/components/QuickStartModal';
+import LandingPage from '@/components/LandingPage';
+import LoginModal from '@/components/LoginModal';
 import { Job, JobStatus, UserProfile } from '@/types/job';
+import { UserSession, getStoredSession, clearSession, saveSession } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
@@ -22,13 +25,22 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddJobOpen, setIsAddJobOpen] = useState(false);
   const [isQuickSetupOpen, setIsQuickSetupOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  const [isLandingPage, setIsLandingPage] = useState(false);
 
-  // Fetch jobs and profile on mount
-  const fetchData = async () => {
+  // Fetch jobs and profile for a specific user
+  const fetchData = useCallback(async (userId?: string) => {
+    setLoading(true);
+    const headers: Record<string, string> = {};
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+
     try {
       const [jobsRes, profileRes] = await Promise.all([
-        fetch('/api/jobs'),
-        fetch('/api/profile'),
+        fetch(userId ? `/api/jobs?userId=${encodeURIComponent(userId)}` : '/api/jobs', { headers }),
+        fetch(userId ? `/api/profile?userId=${encodeURIComponent(userId)}` : '/api/profile', { headers }),
       ]);
 
       const jobsData = await jobsRes.json();
@@ -39,21 +51,45 @@ export default function Home() {
       const profileData = await profileRes.json();
       if (profileData.success && profileData.profile) {
         setProfile(profileData.profile);
-        // If user has not completed quick setup, open modal automatically
-        if (!profileData.profile.hasCompletedQuickSetup) {
-          setIsQuickSetupOpen(true);
-        }
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Initialize session on mount
+  useEffect(() => {
+    const session = getStoredSession();
+    if (session) {
+      setUserSession(session);
+      setIsLandingPage(false);
+      fetchData(session.id);
+    } else {
+      // Show landing page for first-time visitors / unauthenticated users
+      setIsLandingPage(true);
+      setLoading(false);
+    }
+  }, [fetchData]);
+
+  // Handle Login or Quick Start from Landing Page
+  const handleLoginSuccess = (session: UserSession) => {
+    setUserSession(session);
+    saveSession(session);
+    setIsLandingPage(false);
+    setIsLoginOpen(false);
+    fetchData(session.id);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Handle Log Out
+  const handleLogout = () => {
+    clearSession();
+    setUserSession(null);
+    setJobs([]);
+    setProfile(null);
+    setIsLandingPage(true);
+  };
 
   // Compute live pipeline statistics
   const stats = useMemo(() => {
@@ -83,7 +119,10 @@ export default function Home() {
     try {
       await fetch(`/api/jobs/${jobId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(userSession ? { 'x-user-id': userSession.id } : {}),
+        },
         body: JSON.stringify({ status: newStatus }),
       });
     } catch (err) {
@@ -99,7 +138,10 @@ export default function Home() {
       setSelectedJob(null);
     }
     try {
-      await fetch(`/api/jobs/${jobId}`, { method: 'DELETE' });
+      await fetch(`/api/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: userSession ? { 'x-user-id': userSession.id } : {},
+      });
     } catch (err) {
       console.error('Failed to delete job:', err);
     }
@@ -125,7 +167,10 @@ export default function Home() {
     try {
       const res = await fetch('/api/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(userSession ? { 'x-user-id': userSession.id } : {}),
+        },
         body: JSON.stringify(partialProfile),
       });
       const data = await res.json();
@@ -137,6 +182,23 @@ export default function Home() {
     }
   };
 
+  // If user is not logged in or chose to view landing page, render LandingPage
+  if (isLandingPage) {
+    return (
+      <>
+        <LandingPage
+          onEnterApp={handleLoginSuccess}
+          onOpenLogin={() => setIsLoginOpen(true)}
+        />
+        <LoginModal
+          isOpen={isLoginOpen}
+          onClose={() => setIsLoginOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50/70 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Top Navbar */}
@@ -146,6 +208,10 @@ export default function Home() {
         openSettings={() => setIsSettingsOpen(true)}
         openAddJob={() => setIsAddJobOpen(true)}
         profile={profile}
+        userSession={userSession}
+        onLogout={handleLogout}
+        onOpenLogin={() => setIsLoginOpen(true)}
+        onOpenLanding={() => setIsLandingPage(true)}
         stats={stats}
       />
 
@@ -209,6 +275,12 @@ export default function Home() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
 
       <AddJobModal

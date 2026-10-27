@@ -8,9 +8,10 @@
 -- 4. Open the "Console" tab and paste this entire file, then click "Execute"
 -- ====================================================================
 
--- 1. Jobs Table
+-- 1. Jobs Table (User-scoped)
 CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
+  user_id TEXT DEFAULT 'default_user',
   title TEXT NOT NULL,
   company TEXT NOT NULL,
   location TEXT,
@@ -39,11 +40,12 @@ CREATE TABLE IF NOT EXISTS jobs (
   updated_at TEXT
 );
 
+CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs (user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_posted_at ON jobs (posted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs (status);
 CREATE INDEX IF NOT EXISTS idx_jobs_city ON jobs (city);
 
--- 2. User Profile Table
+-- 2. User Profile Table (Multi-user keyed by user_id or email)
 CREATE TABLE IF NOT EXISTS user_profile (
   id TEXT PRIMARY KEY DEFAULT 'default_user',
   name TEXT NOT NULL,
@@ -61,6 +63,7 @@ CREATE TABLE IF NOT EXISTS user_profile (
   skills TEXT, -- JSON stringified array: ["React", "Node"]
   resume_text TEXT,
   resume_file_name TEXT,
+  gemini_api_key TEXT,
   has_completed_quick_setup INTEGER DEFAULT 0,
   bio_notes TEXT,
   updated_at TEXT

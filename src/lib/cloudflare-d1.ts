@@ -80,6 +80,7 @@ function safeParseArray<T>(val: unknown, fallback: T[] = []): T[] {
 export function d1RowToJob(row: any): Job {
   return {
     id: row.id,
+    userId: row.user_id || undefined,
     title: row.title,
     company: row.company,
     location: row.location || 'Remote',
@@ -109,7 +110,14 @@ export function d1RowToJob(row: any): Job {
   };
 }
 
-export async function d1GetJobs(): Promise<Job[]> {
+export async function d1GetJobs(userId?: string): Promise<Job[]> {
+  if (userId) {
+    const rows = await queryD1(
+      'SELECT * FROM jobs WHERE user_id = ? OR user_id = ? ORDER BY posted_at DESC',
+      [userId, 'default_user']
+    );
+    return rows.map(d1RowToJob);
+  }
   const rows = await queryD1('SELECT * FROM jobs ORDER BY posted_at DESC');
   return rows.map(d1RowToJob);
 }
@@ -120,10 +128,12 @@ export async function d1GetJobById(id: string): Promise<Job | undefined> {
   return d1RowToJob(rows[0]);
 }
 
-export async function d1UpsertJob(job: Job): Promise<Job> {
+export async function d1UpsertJob(job: Job, userId?: string): Promise<Job> {
   const nowStr = new Date().toISOString();
+  const targetUserId = job.userId || userId || 'default_user';
   const normalizedJob: Job = {
     ...job,
+    userId: targetUserId,
     postedAt: job.postedAt || nowStr,
     createdAt: job.createdAt || nowStr,
     updatedAt: nowStr,
@@ -131,13 +141,13 @@ export async function d1UpsertJob(job: Job): Promise<Job> {
 
   const sql = `
     INSERT OR REPLACE INTO jobs (
-      id, title, company, location, city, remote_type, role_category,
+      id, user_id, title, company, location, city, remote_type, role_category,
       technologies, salary, salary_in_lpa, url, source, description,
       requirements, department, experience_required, status, match_score,
       match_analysis, cover_letter, cold_pitch, linkedin_dm, notes,
       applied_date, posted_at, created_at, updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
@@ -147,6 +157,7 @@ export async function d1UpsertJob(job: Job): Promise<Job> {
 
   const params = [
     normalizedJob.id,
+    targetUserId,
     normalizedJob.title,
     normalizedJob.company,
     normalizedJob.location,
@@ -179,9 +190,9 @@ export async function d1UpsertJob(job: Job): Promise<Job> {
   return normalizedJob;
 }
 
-export async function d1SaveJobs(jobs: Job[]): Promise<void> {
+export async function d1SaveJobs(jobs: Job[], userId?: string): Promise<void> {
   for (const job of jobs) {
-    await d1UpsertJob(job);
+    await d1UpsertJob(job, userId);
   }
 }
 
@@ -196,7 +207,9 @@ export async function d1DeleteJob(id: string): Promise<boolean> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function d1RowToProfile(row: any): UserProfile {
   return {
-    name: row.name || 'Rushabh Dabare',
+    id: row.id,
+    userId: row.id,
+    name: row.name || 'Job Hunter',
     email: row.email || undefined,
     phone: row.phone || undefined,
     currentLocation: row.current_location || 'Pune, India',
@@ -211,36 +224,47 @@ export function d1RowToProfile(row: any): UserProfile {
     skills: safeParseArray<string>(row.skills, ['React', 'JavaScript', 'TypeScript', 'C#', 'Java', 'SQL']),
     resumeText: row.resume_text || '',
     resumeFileName: row.resume_file_name || undefined,
+    geminiApiKey: row.gemini_api_key || undefined,
     hasCompletedQuickSetup: Boolean(row.has_completed_quick_setup),
     bioNotes: row.bio_notes || undefined,
     updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
-export async function d1GetUserProfile(): Promise<UserProfile | null> {
-  const rows = await queryD1('SELECT * FROM user_profile WHERE id = ? LIMIT 1', ['default_user']);
-  if (!rows || rows.length === 0) return null;
+export async function d1GetUserProfile(userId?: string): Promise<UserProfile | null> {
+  const targetId = userId || 'default_user';
+  const rows = await queryD1('SELECT * FROM user_profile WHERE id = ? LIMIT 1', [targetId]);
+  if (!rows || rows.length === 0) {
+    // If specific user not found, try default_user
+    if (targetId !== 'default_user') {
+      const defaultRows = await queryD1('SELECT * FROM user_profile WHERE id = ? LIMIT 1', ['default_user']);
+      if (defaultRows && defaultRows.length > 0) return d1RowToProfile(defaultRows[0]);
+    }
+    return null;
+  }
   return d1RowToProfile(rows[0]);
 }
 
-export async function d1SaveUserProfile(p: UserProfile): Promise<UserProfile> {
+export async function d1SaveUserProfile(p: UserProfile, userId?: string): Promise<UserProfile> {
+  const targetId = userId || p.email || p.id || 'default_user';
   const sql = `
     INSERT OR REPLACE INTO user_profile (
       id, name, email, phone, current_location, preferred_locations,
       target_titles, preferred_technologies, years_of_experience,
       current_ctc, expected_ctc, notice_period, preferred_work_mode,
-      skills, resume_text, resume_file_name, has_completed_quick_setup,
+      skills, resume_text, resume_file_name, gemini_api_key, has_completed_quick_setup,
       bio_notes, updated_at
     ) VALUES (
-      'default_user', ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
       ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?
     )
   `;
 
   const params = [
+    targetId,
     p.name,
     p.email || null,
     p.phone || null,
@@ -256,13 +280,14 @@ export async function d1SaveUserProfile(p: UserProfile): Promise<UserProfile> {
     JSON.stringify(p.skills || []),
     p.resumeText || '',
     p.resumeFileName || null,
+    p.geminiApiKey || null,
     p.hasCompletedQuickSetup ? 1 : 0,
     p.bioNotes || null,
     p.updatedAt || new Date().toISOString(),
   ];
 
   await queryD1(sql, params);
-  return p;
+  return { ...p, id: targetId, userId: targetId };
 }
 
 // ----------------------------------------------------

@@ -17,7 +17,10 @@ export async function POST(req: Request, context: RouteContext) {
 
     const body = await req.json().catch(() => ({}));
     const pitchType = body.pitchType || 'linkedin_dm';
-    const profile = await getUserProfile();
+    const userId = req.headers.get('x-user-id') || body.userId || undefined;
+    const profile = await getUserProfile(userId);
+
+    const apiKey = body.apiKey || profile.geminiApiKey;
 
     const pitchText = await generatePitch(
       {
@@ -27,7 +30,7 @@ export async function POST(req: Request, context: RouteContext) {
       },
       profile,
       pitchType,
-      body.apiKey
+      apiKey
     );
 
     const updates: Partial<typeof job> = {};
@@ -41,7 +44,7 @@ export async function POST(req: Request, context: RouteContext) {
       ...job,
       ...updates,
       updatedAt: new Date().toISOString(),
-    });
+    }, userId);
 
     return NextResponse.json({ success: true, pitch: pitchText, pitchType, job: updated });
   } catch (error: unknown) {

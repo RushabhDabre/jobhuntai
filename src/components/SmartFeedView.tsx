@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Job, JobStatus, UserProfile } from '@/types/job';
+import { getSafeJobUrl } from '@/lib/jobLinks';
 import {
   Sparkles,
   ExternalLink,
@@ -437,17 +438,15 @@ export default function SmartFeedView({
                   </select>
 
                   <div className="flex items-center gap-2">
-                    {job.url && (
-                      <a
-                        href={job.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors"
-                      >
-                        <span>Apply</span>
-                        <ExternalLink className="w-3 h-3 text-zinc-400" />
-                      </a>
-                    )}
+                    <a
+                      href={getSafeJobUrl(job)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors"
+                    >
+                      <span>Apply</span>
+                      <ExternalLink className="w-3 h-3 text-zinc-400" />
+                    </a>
 
                     <button
                       onClick={() => onSelectJob(job)}

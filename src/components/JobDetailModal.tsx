@@ -20,6 +20,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { Job, JobStatus, MatchAnalysis } from '@/types/job';
+import { getSafeJobUrl, getPlatformSearchUrls } from '@/lib/jobLinks';
 
 interface JobDetailModalProps {
   job: Job | null;
@@ -204,17 +205,15 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {job.url && (
-              <a
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors"
-              >
-                <span>Apply Link</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
+            <a
+              href={getSafeJobUrl(job)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white transition-colors"
+            >
+              <span>Apply / Official Link</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -223,6 +222,52 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
             </button>
           </div>
         </div>
+
+        {/* Live Multi-Platform Search Bar (Guaranteed No 404s) */}
+        {(() => {
+          const platformUrls = getPlatformSearchUrls(job);
+          return (
+            <div className="flex flex-wrap items-center gap-2 px-6 sm:px-7 py-2.5 bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 text-[11px]">
+              <span className="font-semibold text-zinc-500">Live Search On:</span>
+              <a
+                href={platformUrls.linkedIn}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:underline flex items-center gap-1 font-medium transition-colors"
+              >
+                <span>LinkedIn India</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a
+                href={platformUrls.googleJobs}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:underline flex items-center gap-1 font-medium transition-colors"
+              >
+                <span>Google Jobs</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a
+                href={platformUrls.naukri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:underline flex items-center gap-1 font-medium transition-colors"
+              >
+                <span>Naukri</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a
+                href={platformUrls.indeed}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:underline flex items-center gap-1 font-medium transition-colors"
+              >
+                <span>Indeed India</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            </div>
+          );
+        })()}
 
         {/* Tab Navigation */}
         <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 sm:px-7 gap-6 text-sm font-semibold">
