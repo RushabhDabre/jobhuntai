@@ -10,13 +10,13 @@ interface RouteContext {
 export async function POST(req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const job = getJobById(id);
+    const job = await getJobById(id);
     if (!job) {
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
     }
 
     const body = await req.json().catch(() => ({}));
-    const profile = getUserProfile();
+    const profile = await getUserProfile();
 
     const analysis = await matchJobWithResume(
       {
@@ -32,7 +32,7 @@ export async function POST(req: Request, context: RouteContext) {
       body.apiKey
     );
 
-    const updated = upsertJob({
+    const updated = await upsertJob({
       ...job,
       matchScore: analysis.score,
       matchAnalysis: analysis,

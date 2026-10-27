@@ -3,8 +3,8 @@ import { Job } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
 import { parseJobWithAI } from './gemini';
 
-function getFirecrawlClient(customApiKey?: string): FirecrawlApp {
-  const settings = getAppSettings();
+async function getFirecrawlClient(customApiKey?: string): Promise<FirecrawlApp> {
+  const settings = await getAppSettings();
   const apiKey = customApiKey || settings.firecrawlApiKey || process.env.FIRECRAWL_API_KEY;
   if (!apiKey) {
     throw new Error('Firecrawl API key is missing. Please add it in Settings or set FIRECRAWL_API_KEY.');
@@ -21,7 +21,7 @@ export async function scrapeJobWithFirecrawl(
   url: string,
   customApiKey?: string
 ): Promise<ScrapeJobResult> {
-  const firecrawl = getFirecrawlClient(customApiKey);
+  const firecrawl = await getFirecrawlClient(customApiKey);
 
   // Scrape single URL to markdown and metadata
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,7 +65,7 @@ export async function crawlCareerPageWithFirecrawl(
   limit: number = 5,
   customApiKey?: string
 ): Promise<string[]> {
-  const firecrawl = getFirecrawlClient(customApiKey);
+  const firecrawl = await getFirecrawlClient(customApiKey);
 
   // Use map to find all relevant job links on the careers domain
   try {

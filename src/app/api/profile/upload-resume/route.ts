@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
     }
 
-    const settings = getAppSettings();
+    const settings = await getAppSettings();
     const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -108,7 +108,7 @@ Respond strictly in valid JSON matching this schema:
 
     const parsed = JSON.parse(response.text || '{}');
 
-    const updatedProfile = saveUserProfile({
+    const updatedProfile = await saveUserProfile({
       name: parsed.name || 'Candidate',
       email: parsed.email || undefined,
       phone: parsed.phone || undefined,

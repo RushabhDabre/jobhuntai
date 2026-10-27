@@ -4,7 +4,7 @@ import { Job } from '@/types/job';
 
 export async function GET() {
   try {
-    const jobs = getJobs();
+    const jobs = await getJobs();
     return NextResponse.json({ success: true, jobs });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch jobs';
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
           createdAt: item.createdAt || now,
           updatedAt: now,
         };
-        saved.push(upsertJob(job));
+        saved.push(await upsertJob(job));
       }
       return NextResponse.json({ success: true, count: saved.length, jobs: saved });
     }
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       updatedAt: now,
     };
 
-    const saved = upsertJob(job);
+    const saved = await upsertJob(job);
     return NextResponse.json({ success: true, job: saved });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to save job';

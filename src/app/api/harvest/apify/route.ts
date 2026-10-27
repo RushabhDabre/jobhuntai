@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     );
 
     const now = new Date().toISOString();
-    const profile = autoScore ? getUserProfile() : null;
+    const profile = autoScore ? await getUserProfile() : null;
     const savedJobs: Job[] = [];
 
     for (const raw of rawJobs) {
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
         }
       }
 
-      savedJobs.push(upsertJob(newJob));
+      savedJobs.push(await upsertJob(newJob));
     }
 
     return NextResponse.json({

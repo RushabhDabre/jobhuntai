@@ -10,14 +10,14 @@ interface RouteContext {
 export async function POST(req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const job = getJobById(id);
+    const job = await getJobById(id);
     if (!job) {
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
     }
 
     const body = await req.json().catch(() => ({}));
     const pitchType = body.pitchType || 'linkedin_dm';
-    const profile = getUserProfile();
+    const profile = await getUserProfile();
 
     const pitchText = await generatePitch(
       {
@@ -37,7 +37,7 @@ export async function POST(req: Request, context: RouteContext) {
       updates.coldPitch = pitchText;
     }
 
-    const updated = upsertJob({
+    const updated = await upsertJob({
       ...job,
       ...updates,
       updatedAt: new Date().toISOString(),

@@ -3,8 +3,7 @@ import { getAppSettings, saveAppSettings } from '@/lib/storage';
 
 export async function GET() {
   try {
-    const settings = getAppSettings();
-    // Return masked keys for security in UI, but boolean indicators
+    const settings = await getAppSettings();
     return NextResponse.json({
       success: true,
       settings: {
@@ -23,7 +22,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const updated = saveAppSettings(body);
+    const updated = await saveAppSettings(body);
     return NextResponse.json({
       success: true,
       settings: {

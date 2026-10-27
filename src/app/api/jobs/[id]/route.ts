@@ -8,7 +8,7 @@ interface RouteContext {
 export async function GET(_req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const job = getJobById(id);
+    const job = await getJobById(id);
     if (!job) {
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
     }
@@ -22,12 +22,12 @@ export async function GET(_req: Request, context: RouteContext) {
 export async function PATCH(req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const existing = getJobById(id);
+    const existing = await getJobById(id);
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
     }
     const body = await req.json();
-    const updated = upsertJob({
+    const updated = await upsertJob({
       ...existing,
       ...body,
       id,
@@ -43,7 +43,7 @@ export async function PATCH(req: Request, context: RouteContext) {
 export async function DELETE(_req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const deleted = deleteJob(id);
+    const deleted = await deleteJob(id);
     if (!deleted) {
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
     }

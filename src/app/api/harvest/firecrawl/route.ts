@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
     if (autoScore) {
       try {
-        const profile = getUserProfile();
+        const profile = await getUserProfile();
         const analysis = await matchJobWithResume(
           {
             title: newJob.title,
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const saved = upsertJob(newJob);
+    const saved = await upsertJob(newJob);
     return NextResponse.json({ success: true, job: saved });
   } catch (error: unknown) {
     const formatted = parseApiError(error, 'Firecrawl');

@@ -2,8 +2,8 @@ import { GoogleGenAI } from '@google/genai';
 import { Job, UserProfile, MatchAnalysis } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
 
-function getGenAIClient(customApiKey?: string) {
-  const settings = getAppSettings();
+async function getGenAIClient(customApiKey?: string) {
+  const settings = await getAppSettings();
   const apiKey = customApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('Gemini API key is missing. Please configure it in Settings or set GEMINI_API_KEY.');
@@ -19,7 +19,7 @@ export async function matchJobWithResume(
   profile: UserProfile,
   customApiKey?: string
 ): Promise<MatchAnalysis> {
-  const { client, model } = getGenAIClient(customApiKey);
+  const { client, model } = await getGenAIClient(customApiKey);
 
   const prompt = `You are a Principal Tech Recruiter and Career Strategist specializing in the Indian Tech Industry (Bangalore, Pune, Hyderabad, Delhi-NCR, Mumbai, and Remote India).
 Evaluate how well this candidate matches the target job opening to help them LAND AN ACTUAL JOB.
@@ -101,7 +101,7 @@ export async function generatePitch(
   pitchType: 'cover_letter' | 'cold_email' | 'linkedin_dm' = 'linkedin_dm',
   customApiKey?: string
 ): Promise<string> {
-  const { client, model } = getGenAIClient(customApiKey);
+  const { client, model } = await getGenAIClient(customApiKey);
 
   let styleGuide = '';
   if (pitchType === 'cover_letter') {
@@ -148,7 +148,7 @@ export async function parseJobWithAI(
   sourceUrl: string,
   customApiKey?: string
 ): Promise<Partial<Job>> {
-  const { client, model } = getGenAIClient(customApiKey);
+  const { client, model } = await getGenAIClient(customApiKey);
 
   const prompt = `Extract structured job posting details from this scraped text. Focus on Indian tech market parameters (City in India, CTC in LPA if mentioned, experience required).
 Source URL: ${sourceUrl}

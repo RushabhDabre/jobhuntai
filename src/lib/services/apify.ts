@@ -2,8 +2,8 @@ import { ApifyClient } from 'apify-client';
 import { Job } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
 
-function getApifyClient(customToken?: string): ApifyClient {
-  const settings = getAppSettings();
+async function getApifyClient(customToken?: string): Promise<ApifyClient> {
+  const settings = await getAppSettings();
   const token = customToken || settings.apifyApiToken || process.env.APIFY_API_TOKEN;
   if (!token) {
     throw new Error('Apify API token is missing. Please add it in Settings or set APIFY_API_TOKEN.');
@@ -23,7 +23,7 @@ export async function searchJobsWithApify(
   params: ApifySearchParams,
   customToken?: string
 ): Promise<Partial<Job>[]> {
-  const client = getApifyClient(customToken);
+  const client = await getApifyClient(customToken);
   const maxItems = Math.min(params.maxItems || 10, 25);
   const queryStr = params.queries.join(' ');
   const locationStr = params.location || 'United States';
