@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAppSettings, saveAppSettings } from '@/lib/storage';
+import { getAppSettings, saveAppSettings, getStorageMode } from '@/lib/storage';
+import { isCloudflareD1Configured } from '@/lib/cloudflare-d1';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
 export async function GET() {
   try {
@@ -11,6 +13,11 @@ export async function GET() {
         hasGeminiKey: Boolean(settings.geminiApiKey),
         hasFirecrawlKey: Boolean(settings.firecrawlApiKey),
         hasApifyToken: Boolean(settings.apifyApiToken),
+      },
+      storage: {
+        mode: getStorageMode(),
+        hasCloudflareD1: isCloudflareD1Configured(),
+        hasSupabase: isSupabaseConfigured(),
       },
     });
   } catch (error: unknown) {
@@ -30,6 +37,11 @@ export async function POST(req: Request) {
         hasGeminiKey: Boolean(updated.geminiApiKey),
         hasFirecrawlKey: Boolean(updated.firecrawlApiKey),
         hasApifyToken: Boolean(updated.apifyApiToken),
+      },
+      storage: {
+        mode: getStorageMode(),
+        hasCloudflareD1: isCloudflareD1Configured(),
+        hasSupabase: isSupabaseConfigured(),
       },
     });
   } catch (error: unknown) {

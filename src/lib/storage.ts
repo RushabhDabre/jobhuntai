@@ -1,6 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Job, UserProfile, AppSettings } from '@/types/job';
+import {
+  isCloudflareD1Configured,
+  d1GetJobs,
+  d1GetJobById,
+  d1UpsertJob,
+  d1SaveJobs,
+  d1DeleteJob,
+  d1GetUserProfile,
+  d1SaveUserProfile,
+  d1GetAppSettings,
+  d1SaveAppSettings,
+} from './cloudflare-d1';
 import { getSupabaseClient, isSupabaseConfigured } from './supabase';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -16,6 +28,12 @@ function ensureDataDir() {
       // In serverless environments, fs.mkdirSync may fail if read-only
     }
   }
+}
+
+export function getStorageMode(): 'cloudflare-d1' | 'supabase' | 'local' {
+  if (isCloudflareD1Configured()) return 'cloudflare-d1';
+  if (isSupabaseConfigured()) return 'supabase';
+  return 'local';
 }
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -42,7 +60,7 @@ const DEFAULT_PROFILE: UserProfile = {
     'Spring Boot',
     'Node.js',
     'REST APIs',
-    'Git'
+    'Git',
   ],
   resumeText: `RUSHABH DABARE
 Software Developer | Pune, Maharashtra | +91 9067015129 | Notice: Immediate Joiner
@@ -181,6 +199,19 @@ function profileToDb(p: UserProfile) {
 // JOBS API
 // ==========================================
 export async function getJobs(): Promise<Job[]> {
+  // 1. First Tier: Cloudflare D1 Serverless Database
+  if (isCloudflareD1Configured()) {
+    try {
+      const d1Jobs = await d1GetJobs();
+      if (Array.isArray(d1Jobs) && d1Jobs.length > 0) {
+        return d1Jobs;
+      }
+    } catch (err) {
+      console.warn('Cloudflare D1 query failed, falling back:', err);
+    }
+  }
+
+  // 2. Second Tier: Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -197,7 +228,7 @@ export async function getJobs(): Promise<Job[]> {
     }
   }
 
-  // Local JSON fallback
+  // 3. Third Tier: Local JSON fallback
   ensureDataDir();
   if (!fs.existsSync(JOBS_FILE)) {
     return [];
@@ -212,6 +243,16 @@ export async function getJobs(): Promise<Job[]> {
 }
 
 export async function saveJobs(jobs: Job[]): Promise<void> {
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      await d1SaveJobs(jobs);
+    } catch (err) {
+      console.warn('Cloudflare D1 saveJobs failed:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -222,6 +263,7 @@ export async function saveJobs(jobs: Job[]): Promise<void> {
     }
   }
 
+  // 3. Local JSON fallback
   ensureDataDir();
   try {
     fs.writeFileSync(JOBS_FILE, JSON.stringify(jobs, null, 2), 'utf-8');
@@ -231,6 +273,17 @@ export async function saveJobs(jobs: Job[]): Promise<void> {
 }
 
 export async function getJobById(id: string): Promise<Job | undefined> {
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      const job = await d1GetJobById(id);
+      if (job) return job;
+    } catch (err) {
+      console.warn('Cloudflare D1 getJobById failed, falling back:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -247,6 +300,7 @@ export async function getJobById(id: string): Promise<Job | undefined> {
     }
   }
 
+  // 3. Local JSON fallback
   const jobs = await getJobs();
   return jobs.find((j) => j.id === id);
 }
@@ -260,55 +314,112 @@ export async function upsertJob(job: Job): Promise<Job> {
     updatedAt: nowStr,
   };
 
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      await d1UpsertJob(normalizedJob);
+    } catch (err) {
+      console.warn('Cloudflare D1 upsertJob failed:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
       const row = jobToDb(normalizedJob);
-      const { error } = await supabase.from('jobs').upsert(row);
-      if (!error) {
-        return normalizedJob;
-      }
+      await supabase.from('jobs').upsert(row);
     } catch (err) {
-      console.warn('Supabase upsertJob failed, saving to local JSON:', err);
+      console.warn('Supabase upsertJob failed:', err);
     }
   }
 
-  // Local JSON fallback
-  const jobs = await getJobs();
-  const index = jobs.findIndex((j) => j.id === normalizedJob.id);
-  if (index >= 0) {
-    jobs[index] = { ...jobs[index], ...normalizedJob };
-  } else {
-    jobs.unshift(normalizedJob);
+  // 3. Local JSON fallback
+  try {
+    ensureDataDir();
+    let jobs: Job[] = [];
+    if (fs.existsSync(JOBS_FILE)) {
+      try {
+        const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
+        jobs = JSON.parse(raw);
+        if (!Array.isArray(jobs)) jobs = [];
+      } catch {
+        jobs = [];
+      }
+    }
+    const index = jobs.findIndex((j) => j.id === normalizedJob.id);
+    if (index >= 0) {
+      jobs[index] = { ...jobs[index], ...normalizedJob };
+    } else {
+      jobs.unshift(normalizedJob);
+    }
+    fs.writeFileSync(JOBS_FILE, JSON.stringify(jobs, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Local JSON upsertJob write skipped:', err);
   }
-  await saveJobs(jobs);
+
   return normalizedJob;
 }
 
 export async function deleteJob(id: string): Promise<boolean> {
+  let deleted = false;
+
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      deleted = await d1DeleteJob(id);
+    } catch (err) {
+      console.warn('Cloudflare D1 deleteJob failed:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
       const { error } = await supabase.from('jobs').delete().eq('id', id);
-      if (!error) return true;
+      if (!error) deleted = true;
     } catch {
       // fallback
     }
   }
 
-  const jobs = await getJobs();
-  const filtered = jobs.filter((j) => j.id !== id);
-  if (filtered.length !== jobs.length) {
-    await saveJobs(filtered);
-    return true;
+  // 3. Local JSON fallback
+  try {
+    ensureDataDir();
+    if (fs.existsSync(JOBS_FILE)) {
+      const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
+      const jobs: Job[] = JSON.parse(raw);
+      if (Array.isArray(jobs)) {
+        const filtered = jobs.filter((j) => j.id !== id);
+        if (filtered.length !== jobs.length) {
+          fs.writeFileSync(JOBS_FILE, JSON.stringify(filtered, null, 2), 'utf-8');
+          deleted = true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Local JSON deleteJob skipped:', err);
   }
-  return false;
+
+  return deleted;
 }
 
 // ==========================================
 // PROFILE API
 // ==========================================
 export async function getUserProfile(): Promise<UserProfile> {
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      const profile = await d1GetUserProfile();
+      if (profile) return profile;
+    } catch (err) {
+      console.warn('Cloudflare D1 getUserProfile failed, falling back:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -325,7 +436,7 @@ export async function getUserProfile(): Promise<UserProfile> {
     }
   }
 
-  // Local JSON fallback
+  // 3. Local JSON fallback
   ensureDataDir();
   if (!fs.existsSync(PROFILE_FILE)) {
     return DEFAULT_PROFILE;
@@ -346,6 +457,16 @@ export async function saveUserProfile(profile: Partial<UserProfile>): Promise<Us
     updatedAt: new Date().toISOString(),
   };
 
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      await d1SaveUserProfile(updated);
+    } catch (err) {
+      console.warn('Cloudflare D1 saveUserProfile failed:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -356,6 +477,7 @@ export async function saveUserProfile(profile: Partial<UserProfile>): Promise<Us
     }
   }
 
+  // 3. Local JSON fallback
   ensureDataDir();
   try {
     fs.writeFileSync(PROFILE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
@@ -370,6 +492,17 @@ export async function saveUserProfile(profile: Partial<UserProfile>): Promise<Us
 // SETTINGS API
 // ==========================================
 export async function getAppSettings(): Promise<AppSettings> {
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      const settings = await d1GetAppSettings();
+      if (settings) return settings;
+    } catch (err) {
+      console.warn('Cloudflare D1 getAppSettings failed, falling back:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -393,6 +526,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     }
   }
 
+  // 3. Local JSON fallback
   ensureDataDir();
   if (!fs.existsSync(SETTINGS_FILE)) {
     return DEFAULT_SETTINGS;
@@ -420,6 +554,16 @@ export async function saveAppSettings(settings: Partial<AppSettings>): Promise<A
     updatedAt: new Date().toISOString(),
   };
 
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      await d1SaveAppSettings(updated);
+    } catch (err) {
+      console.warn('Cloudflare D1 saveAppSettings failed:', err);
+    }
+  }
+
+  // 2. Supabase
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
@@ -437,6 +581,7 @@ export async function saveAppSettings(settings: Partial<AppSettings>): Promise<A
     }
   }
 
+  // 3. Local JSON fallback
   ensureDataDir();
   try {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
