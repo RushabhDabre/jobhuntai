@@ -442,6 +442,7 @@ export default function QuickStartModal({
       }
       const res = await fetch('/api/profile/upload-resume', {
         method: 'POST',
+        signal: AbortSignal.timeout(25000),
         headers,
         body: formData,
       });

@@ -96,6 +96,7 @@ export default function SmartFeedView({
     try {
       const res = await fetch('/api/harvest/company-url', {
         method: 'POST',
+        signal: AbortSignal.timeout(25000),
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ url: targetUrl }),
       });
@@ -114,7 +115,7 @@ export default function SmartFeedView({
       });
       setCompanyUrlInput('');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Scraping failed';
+      const msg = err instanceof Error ? (err.name === 'TimeoutError' || err.message.includes('timeout') ? 'Company portal scraping timed out. Please retry or check the URL.' : err.message) : 'Scraping failed';
       setCompanyScrapeMsg({ type: 'error', text: msg });
     } finally {
       setIsScrapingCompany(false);
@@ -131,6 +132,7 @@ export default function SmartFeedView({
     try {
       const res = await fetch('/api/jobs/search-platforms', {
         method: 'POST',
+        signal: AbortSignal.timeout(25000),
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           query,

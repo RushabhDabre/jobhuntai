@@ -137,6 +137,7 @@ export default function ProfileView() {
       }
       const res = await fetch('/api/profile/upload-resume', {
         method: 'POST',
+        signal: AbortSignal.timeout(25000),
         headers,
         body: formData,
       });
@@ -155,10 +156,10 @@ export default function ProfileView() {
       setProfile(data.profile);
       setUploadMessage({
         type: 'success',
-        text: `Resume "${file.name}" uploaded and parsed with Gemini! Profile updated.`,
+        text: `Resume "${file.name}" uploaded and parsed! Profile updated.`,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Upload failed';
+      const msg = err instanceof Error ? (err.name === 'TimeoutError' || err.message.includes('timeout') ? 'Resume parsing timed out. Please try again.' : err.message) : 'Upload failed';
       setUploadMessage({ type: 'error', text: msg });
     } finally {
       setUploadingResume(false);

@@ -2,6 +2,7 @@ import { Job, UserProfile } from '@/types/job';
 import { harvestFromAts } from './ats';
 import { executeAiWithFailover } from './aiRouter';
 import { getAppSettings } from '../storage';
+import { withTimeout } from '@/lib/timeout';
 import FirecrawlApp from '@mendable/firecrawl-js';
 
 export interface CompanyScrapeResult {
@@ -205,11 +206,15 @@ export async function scrapeCompanyCareerUrl(
   const atsInfo = detectAtsFromUrl(fullUrl);
   if (atsInfo) {
     try {
-      const harvested = await harvestFromAts({
-        platform: atsInfo.platform,
-        companySlug: atsInfo.slug,
-        limit: 15,
-      });
+      const harvested = await withTimeout(
+        harvestFromAts({
+          platform: atsInfo.platform,
+          companySlug: atsInfo.slug,
+          limit: 15,
+        }),
+        6000,
+        'ATS harvest timed out after 6s'
+      );
 
       if (harvested && harvested.length > 0) {
         const jobs: Partial<Job>[] = harvested.map((j) => {
@@ -238,7 +243,7 @@ export async function scrapeCompanyCareerUrl(
     }
   }
 
-  // Step 2: Extract text content using Firecrawl or direct fetch
+  // Step 2: Extract text content using Firecrawl or direct fetch (with strict timeouts)
   let pageContent = '';
   const settings = await getAppSettings();
 
@@ -246,7 +251,11 @@ export async function scrapeCompanyCareerUrl(
     try {
       const firecrawl = new FirecrawlApp({ apiKey: settings.firecrawlApiKey });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const scrapeRes: any = await firecrawl.scrapeUrl(fullUrl, { formats: ['markdown'] });
+      const scrapeRes: any = await withTimeout(
+        firecrawl.scrapeUrl(fullUrl, { formats: ['markdown'] }),
+        6500,
+        'Firecrawl scraping timed out after 6.5s'
+      );
       if (scrapeRes?.markdown) {
         pageContent = scrapeRes.markdown.slice(0, 16000);
       }
@@ -258,6 +267,7 @@ export async function scrapeCompanyCareerUrl(
   if (!pageContent) {
     try {
       const webRes = await fetch(fullUrl, {
+        signal: AbortSignal.timeout(6000),
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -273,6 +283,18 @@ export async function scrapeCompanyCareerUrl(
   }
 
   // Step 3: AI-Powered Multi-Job Extraction for this company portal
+  let rawJobs: Array<{
+    title?: string;
+    company?: string;
+    location?: string;
+    remoteType?: 'remote' | 'hybrid' | 'onsite';
+    experienceRequired?: string;
+    salaryInLpa?: string;
+    requirements?: string[];
+    description?: string;
+    applyUrl?: string;
+  }> = [];
+
   try {
     const aiPrompt = `You are a Senior Technical Recruiter and Career Web Scraper.
 A candidate is searching for jobs on the official career portal of ${companyName} (${fullUrl}).
@@ -305,26 +327,18 @@ CRITICAL RULES:
    - "applyUrl": direct URL or search query link on ${companyName}'s portal for this role (e.g. "${fullUrl}?q=React")
 4. Return a valid JSON array of 5 to 8 distinct job objects: [ { ... }, { ... } ]`;
 
-    const aiRes = await executeAiWithFailover({
-      prompt: aiPrompt,
-      systemPrompt: 'You extract multiple specific job listings from company career portals. Always output a clean JSON array of distinct open jobs.',
-      responseJson: true,
-      profile: userProfile,
-    });
-
-    let rawJobs: Array<{
-      title?: string;
-      company?: string;
-      location?: string;
-      remoteType?: 'remote' | 'hybrid' | 'onsite';
-      experienceRequired?: string;
-      salaryInLpa?: string;
-      requirements?: string[];
-      description?: string;
-      applyUrl?: string;
-    }> = [];
-
     try {
+      const aiRes = await withTimeout(
+        executeAiWithFailover({
+          prompt: aiPrompt,
+          systemPrompt: 'You extract multiple specific job listings from company career portals. Always output a clean JSON array of distinct open jobs.',
+          responseJson: true,
+          profile: userProfile,
+        }),
+        10000,
+        'AI company job extraction timed out after 10s'
+      );
+
       const cleanJson = (aiRes.text || '[]').replace(/```json\n?|\n?```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
       if (Array.isArray(parsed)) {
@@ -332,8 +346,8 @@ CRITICAL RULES:
       } else if (parsed && Array.isArray(parsed.jobs)) {
         rawJobs = parsed.jobs;
       }
-    } catch {
-      // Handled below
+    } catch (aiErr) {
+      console.warn('AI job extraction skipped or timed out, activating guaranteed multi-role generator:', aiErr);
     }
 
     // Filter out any accidental generic title placeholders

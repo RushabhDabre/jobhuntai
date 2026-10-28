@@ -15,6 +15,7 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
   if (platform === 'greenhouse') {
     const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`, {
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) {
       throw new Error(`Failed to fetch Greenhouse board for "${slug}": ${res.statusText}`);
@@ -47,6 +48,7 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
   if (platform === 'lever') {
     const res = await fetch(`https://api.lever.co/v0/postings/${slug}?mode=json`, {
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) {
       throw new Error(`Failed to fetch Lever board for "${slug}": ${res.statusText}`);
@@ -78,6 +80,7 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
   if (platform === 'ashby') {
     const res = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${slug}`, {
       headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) {
       throw new Error(`Failed to fetch Ashby board for "${slug}": ${res.statusText}`);

@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { Job, UserProfile, MatchAnalysis } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
 import { executeAiWithFailover } from './aiRouter';
+import { withTimeout } from '@/lib/timeout';
 
 export function normalizeGeminiModel(model?: string): string {
   if (!model || model.startsWith('gemini-2.') || model.startsWith('gemini-1.') || model.includes('2.5-flash')) {
@@ -13,22 +14,21 @@ export function normalizeGeminiModel(model?: string): string {
 /**
  * Resilient Gemini Content Generator
  * Handles 503 (high demand) and 429 (rate limits) by:
- * 1. Backing off and retrying
- * 2. Cascading to alternative models (e.g. gemini-3.5-flash-lite, gemini-4-argon)
+ * 1. Imposing strict per-call timeouts
+ * 2. Cascading immediately to fast alternative models (e.g. gemini-3.5-flash-lite)
  */
 export async function generateContentWithRetry(
   client: GoogleGenAI,
   preferredModel: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params: any,
-  maxRetries = 2
+  maxRetries = 1
 ) {
   const normPreferred = normalizeGeminiModel(preferredModel);
-  // Fallback priority: preferred -> gemini-3.5-flash-lite (high throughput, rarely overloaded) -> gemini-4-argon
+  // Fallback priority: preferred -> gemini-3.5-flash-lite (high throughput, low latency)
   const candidateModels = [
     normPreferred,
     normPreferred !== 'gemini-3.5-flash-lite' ? 'gemini-3.5-flash-lite' : 'gemini-3.8-flash',
-    'gemini-4-argon',
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   let lastError: unknown;
@@ -36,10 +36,14 @@ export async function generateContentWithRetry(
   for (const model of candidateModels) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const response = await client.models.generateContent({
-          ...params,
-          model,
-        });
+        const response = await withTimeout(
+          client.models.generateContent({
+            ...params,
+            model,
+          }),
+          8500,
+          `Gemini ${model} timed out after 8.5s`
+        );
         return response;
       } catch (err: unknown) {
         lastError = err;
@@ -50,16 +54,17 @@ export async function generateContentWithRetry(
           msg.includes('unavailable') ||
           msg.includes('rate limit') ||
           msg.includes('resource_exhausted') ||
-          msg.includes('429');
+          msg.includes('429') ||
+          msg.includes('timed out');
 
         if (!isTransient) {
           // If it's an auth error (401/403/invalid key), throw immediately without retrying
           throw err;
         }
 
-        // Wait with backoff before retry or trying next model
+        // Fast backoff before next attempt or switching model
         if (attempt < maxRetries) {
-          await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
+          await new Promise((res) => setTimeout(res, 600));
         }
       }
     }

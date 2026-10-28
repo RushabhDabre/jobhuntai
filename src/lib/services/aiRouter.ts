@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { UserProfile } from '@/types/job';
 import { generateContentWithRetry, normalizeGeminiModel } from './gemini';
+import { withTimeout } from '@/lib/timeout';
 
 export type AiProvider = 'gemini' | 'groq' | 'openrouter' | 'openai' | 'claude' | 'grok';
 
@@ -46,16 +47,20 @@ async function callGemini(
     ? `${systemPrompt}\n\nTask:\n${prompt}`
     : prompt;
 
-  const res = await generateContentWithRetry(client, model, {
-    contents: fullPrompt,
-    ...(responseJson
-      ? {
-          config: {
-            responseMimeType: 'application/json',
-          },
-        }
-      : {}),
-  });
+  const res = await withTimeout(
+    generateContentWithRetry(client, model, {
+      contents: fullPrompt,
+      ...(responseJson
+        ? {
+            config: {
+              responseMimeType: 'application/json',
+            },
+          }
+        : {}),
+    }),
+    11000,
+    'Gemini generation timed out after 11s'
+  );
 
   return {
     text: res.text || '',
@@ -69,34 +74,62 @@ async function callGroq(
   systemPrompt?: string,
   responseJson?: boolean
 ): Promise<{ text: string; model: string }> {
-  const model = 'llama-3.3-70b-versatile';
+  // llama-3.1-8b-instant is universally enabled for all free Groq accounts with highest TPM
+  const candidateModels = [
+    'llama-3.1-8b-instant',
+    'llama-3.3-70b-versatile',
+    'llama3-8b-8192',
+    'mixtral-8x7b-32768',
+  ];
+
   const messages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
     { role: 'user', content: prompt },
   ];
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey.trim()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.2,
-      ...(responseJson ? { response_format: { type: 'json_object' } } : {}),
-    }),
-  });
+  let lastError: unknown;
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Groq API Error (${res.status}): ${errText}`);
+  for (const model of candidateModels) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: AbortSignal.timeout(8000),
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.2,
+          ...(responseJson ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        if (res.status === 404 || errText.includes('model_not_found') || errText.includes('does not exist')) {
+          console.warn(`[Groq] Model ${model} not accessible on key, trying next model...`);
+          lastError = new Error(`Groq API Error (${res.status}): ${errText}`);
+          continue;
+        }
+        throw new Error(`Groq API Error (${res.status}): ${errText}`);
+      }
+
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      return { text, model };
+    } catch (err: unknown) {
+      lastError = err;
+      const msg = String(err).toLowerCase();
+      if (msg.includes('404') || msg.includes('model_not_found') || msg.includes('does not exist')) {
+        continue;
+      }
+      throw err;
+    }
   }
 
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content || '';
-  return { text, model };
+  throw lastError;
 }
 
 async function callOpenRouter(
@@ -105,36 +138,62 @@ async function callOpenRouter(
   systemPrompt?: string,
   responseJson?: boolean
 ): Promise<{ text: string; model: string }> {
-  const model = 'meta-llama/llama-3.3-70b-instruct:free';
+  const candidateModels = [
+    'meta-llama/llama-3.1-8b-instruct:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'google/gemini-2.0-flash-exp:free',
+  ];
+
   const messages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
     { role: 'user', content: prompt },
   ];
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey.trim()}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://jobhuntai.app',
-      'X-Title': 'JobHuntAI Candidate Engine',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.2,
-      ...(responseJson ? { response_format: { type: 'json_object' } } : {}),
-    }),
-  });
+  let lastError: unknown;
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+  for (const model of candidateModels) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        signal: AbortSignal.timeout(10000),
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://jobhuntai.app',
+          'X-Title': 'JobHuntAI Candidate Engine',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.2,
+          ...(responseJson ? { response_format: { type: 'json_object' } } : {}),
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        if (res.status === 404 || errText.includes('model_not_found')) {
+          console.warn(`[OpenRouter] Model ${model} not found, trying fallback...`);
+          lastError = new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+          continue;
+        }
+        throw new Error(`OpenRouter API Error (${res.status}): ${errText}`);
+      }
+
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content || '';
+      return { text, model };
+    } catch (err: unknown) {
+      lastError = err;
+      const msg = String(err).toLowerCase();
+      if (msg.includes('404') || msg.includes('model_not_found')) {
+        continue;
+      }
+      throw err;
+    }
   }
 
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content || '';
-  return { text, model };
+  throw lastError;
 }
 
 async function callOpenAI(
@@ -151,6 +210,7 @@ async function callOpenAI(
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(10000),
     headers: {
       Authorization: `Bearer ${apiKey.trim()}`,
       'Content-Type': 'application/json',
@@ -182,6 +242,7 @@ async function callClaude(
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: AbortSignal.timeout(10000),
     headers: {
       'x-api-key': apiKey.trim(),
       'anthropic-version': '2023-06-01',
@@ -218,6 +279,7 @@ async function callGrok(
 
   const res = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
+    signal: AbortSignal.timeout(10000),
     headers: {
       Authorization: `Bearer ${apiKey.trim()}`,
       'Content-Type': 'application/json',
