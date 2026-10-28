@@ -12,9 +12,6 @@ import {
   AlertCircle,
   Save,
   Loader2,
-  Database,
-  Cloud,
-  Smartphone,
   Zap,
   Cpu,
   Layers,
@@ -53,15 +50,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     defaultGeminiModel: 'gemini-3.8-flash',
     updatedAt: '',
   });
-  const [storageInfo, setStorageInfo] = useState<{
-    mode: 'cloudflare-d1' | 'supabase' | 'local';
-    hasCloudflareD1: boolean;
-    hasSupabase: boolean;
-  }>({
-    mode: 'local',
-    hasCloudflareD1: false,
-    hasSupabase: false,
-  });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,9 +62,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         .then((data) => {
           if (data.success) {
             setSettings(data.settings);
-          }
-          if (data.storage) {
-            setStorageInfo(data.storage);
           }
         })
         .finally(() => setLoading(false));
@@ -95,9 +80,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       const data = await res.json();
       if (data.success) {
         setSettings(data.settings);
-        if (data.storage) {
-          setStorageInfo(data.storage);
-        }
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 2500);
       }
@@ -121,10 +103,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                Settings & Multi-AI Hub
+                AI Engines & Scraper Settings
               </h2>
               <p className="text-xs text-zinc-500">
-                Configure free AI engines with auto-failover, scrapers, and 24/7 cloud sync
+                Configure your free AI keys, primary engine, and optional scrapers
               </p>
             </div>
           </div>
@@ -384,77 +366,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       className="w-full text-xs px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl font-mono mt-1"
                     />
                   </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Cloud Storage & 24/7 Mobile Sync Banner */}
-            <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-linear-to-br from-indigo-50/60 via-purple-50/30 to-white dark:from-indigo-950/20 dark:via-zinc-900 dark:to-zinc-900 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Database className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                    24/7 Cloud Database (Mobile & Laptop Sync)
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="text-[11px] font-semibold text-zinc-500">Active Storage:</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    storageInfo.mode === 'cloudflare-d1'
-                      ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                      : storageInfo.mode === 'supabase'
-                      ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                      : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                  }`}>
-                    {storageInfo.mode === 'cloudflare-d1' ? 'Cloudflare D1' : storageInfo.mode === 'supabase' ? 'Supabase' : 'Local File'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                {/* Cloudflare D1 Status */}
-                <div className={`p-3 rounded-xl border flex items-center justify-between ${
-                  storageInfo.hasCloudflareD1
-                    ? 'border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/30'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <Cloud className="w-4 h-4 text-amber-500" />
-                    <div>
-                      <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Cloudflare D1</div>
-                      <div className="text-[10px] text-zinc-500">Free Edge Serverless SQLite</div>
-                    </div>
-                  </div>
-                  {storageInfo.hasCloudflareD1 ? (
-                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100/80 dark:bg-amber-900/60 px-2 py-0.5 rounded-full">
-                      CONNECTED
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-zinc-400">Add to .env</span>
-                  )}
-                </div>
-
-                {/* Supabase Status */}
-                <div className={`p-3 rounded-xl border flex items-center justify-between ${
-                  storageInfo.hasSupabase
-                    ? 'border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/30'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-emerald-500" />
-                    <div>
-                      <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Supabase</div>
-                      <div className="text-[10px] text-zinc-500">Cloud PostgreSQL</div>
-                    </div>
-                  </div>
-                  {storageInfo.hasSupabase ? (
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full">
-                      CONNECTED
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-zinc-400">Optional</span>
-                  )}
                 </div>
               </div>
             </div>

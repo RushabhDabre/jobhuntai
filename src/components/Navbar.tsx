@@ -134,7 +134,7 @@ export default function Navbar({
 
             <button
               onClick={openSettings}
-              title="API Keys & Database Status"
+              title="AI & Scraper Settings"
               className="p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               <Settings className="w-5 h-5" />
