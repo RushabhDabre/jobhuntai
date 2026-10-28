@@ -50,22 +50,40 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(arrayBuffer);
     const mimeType = file.type || 'application/pdf';
 
-    const systemPrompt = `You are an expert HR Tech recruiter and ATS resume parser specializing in the Indian software engineering market (Pune, Mumbai, Hyderabad, Bengaluru, Gurgaon).
-Extract all key profile data from the uploaded resume file accurately into strict JSON with the following structure:
+    const systemPrompt = `You are an expert HR Tech recruiter and ATS resume parser for the Indian tech and corporate hiring market (Pune, Mumbai, Hyderabad, Bengaluru, Delhi-NCR, Chennai).
+Analyze this candidate's uploaded resume carefully. Identify their EXACT specialization, profession, and domain:
+Examples:
+- SAP (e.g. SAP ABAP Consultant, SAP FICO, SAP MM, SAP SD, SAP HANA Developer, SAP Basis, SAP S/4HANA)
+- DevOps / Cloud / SRE (e.g. DevOps Engineer, Cloud Engineer, Site Reliability Engineer, Platform Engineer, Kubernetes/AWS Engineer)
+- Fullstack / Frontend / Backend (e.g. React Developer, Node.js Engineer, Java Spring Boot Developer, .NET Core Developer, Python Developer)
+- Salesforce (e.g. Salesforce Developer, Salesforce Administrator, Apex/LWC Specialist)
+- Data Science / AI / ML / Data Engineering (e.g. Data Engineer, Data Scientist, ML Engineer, BI Analyst)
+- QA / Testing / SDET (e.g. QA Automation Engineer, SDET, Performance Tester, Manual QA)
+- Cyber Security (e.g. SOC Analyst, Security Engineer, Penetration Tester)
+- Mobile (e.g. Flutter Developer, Android Developer, iOS Developer)
+
+Extract all profile data into strict JSON with this exact structure:
 {
   "name": "Candidate Full Name",
   "email": "Email address if present",
   "phone": "Phone number if present",
   "currentLocation": "City and State if present (e.g. Pune, Maharashtra)",
   "yearsOfExperience": 3,
-  "targetTitles": ["Software Developer", "Frontend Developer", "React Developer"],
-  "skills": ["React", "JavaScript", "TypeScript", "Node.js", "Java", "SQL"],
+  "domainCategory": "Exact domain e.g. 'DevOps & Cloud' or 'SAP ERP' or 'Fullstack Development' or 'QA Automation' or 'Data Engineering'",
+  "targetTitles": ["Primary Job Title from Resume", "Secondary Equivalent Title"],
+  "suggestedRoles": [
+    "List of 5 to 8 realistic, high-demand job titles in India matching this candidate's EXACT domain (e.g. for SAP: 'SAP ABAP Consultant', 'SAP HANA Developer', 'SAP Technical Lead'; for DevOps: 'DevOps Engineer', 'Cloud Infrastructure Engineer', 'Kubernetes Administrator', 'SRE')"
+  ],
+  "skills": ["Key skills and frameworks extracted from the resume"],
+  "suggestedTechnologies": [
+    "List of 8 to 14 top primary technologies, tools, and platforms specific to this candidate's resume (e.g. for DevOps: 'Kubernetes', 'Docker', 'Terraform', 'AWS', 'Jenkins', 'Ansible'; for SAP: 'SAP ABAP', 'SAP S/4HANA', 'IDoc', 'BAPI', 'SAP Fiori', 'SAP MM')"
+  ],
   "currentCtc": "₹X LPA if mentioned or empty string",
   "expectedCtc": "₹Y LPA if mentioned or empty string",
   "noticePeriod": "Immediate Joiner / 15 Days / 30 Days / 60 Days / 90 Days",
   "cleanResumeMarkdown": "Clean markdown summary of candidate work experience, key achievements, and technologies used."
 }
-Be precise. If experience years are not explicitly stated, calculate from first job to present.`;
+Be precise. Calculate yearsOfExperience from first professional role to present.`;
 
     const promptContents = [
       {
@@ -97,9 +115,19 @@ Be precise. If experience years are not explicitly stated, calculate from first 
         phone: parsed.phone || userProfile?.phone || undefined,
         currentLocation: parsed.currentLocation || userProfile?.currentLocation || 'Pune, India',
         yearsOfExperience: Number(parsed.yearsOfExperience) || userProfile?.yearsOfExperience || 2,
+        domainCategory: parsed.domainCategory || undefined,
         targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
           ? parsed.targetTitles
-          : userProfile?.targetTitles || ['Software Developer', 'React Developer'],
+          : Array.isArray(parsed.suggestedRoles) && parsed.suggestedRoles.length > 0
+          ? parsed.suggestedRoles.slice(0, 3)
+          : userProfile?.targetTitles || [],
+        suggestedRoles: Array.isArray(parsed.suggestedRoles) ? parsed.suggestedRoles : [],
+        preferredTechnologies: Array.isArray(parsed.suggestedTechnologies) && parsed.suggestedTechnologies.length > 0
+          ? parsed.suggestedTechnologies.slice(0, 6)
+          : Array.isArray(parsed.skills) && parsed.skills.length > 0
+          ? parsed.skills.slice(0, 6)
+          : userProfile?.preferredTechnologies || [],
+        suggestedTechnologies: Array.isArray(parsed.suggestedTechnologies) ? parsed.suggestedTechnologies : [],
         skills: Array.isArray(parsed.skills) && parsed.skills.length > 0 ? parsed.skills : userProfile?.skills || [],
         resumeText: parsed.cleanResumeMarkdown || buffer.toString('utf-8', 0, 3000),
         resumeFileName: file.name,

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile } from '@/types/job';
+import { getAuthHeaders } from '@/lib/auth';
 import {
   User,
   Sparkles,
@@ -52,7 +53,7 @@ export default function ProfileView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('/api/profile')
+    fetch('/api/profile', { headers: getAuthHeaders() })
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -69,7 +70,10 @@ export default function ProfileView() {
     try {
       const res = await fetch('/api/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify(profile),
       });
       const data = await res.json();
@@ -97,6 +101,7 @@ export default function ProfileView() {
     try {
       const res = await fetch('/api/profile/upload-resume', {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: formData,
       });
       const data = await res.json();
@@ -193,6 +198,11 @@ export default function ProfileView() {
               <span className="text-xs text-zinc-500 flex items-center gap-1">
                 <FileCheck className="w-3.5 h-3.5 text-indigo-500" />
                 {profile.resumeFileName}
+              </span>
+            )}
+            {profile.domainCategory && (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                Domain: {profile.domainCategory}
               </span>
             )}
           </div>
@@ -484,6 +494,31 @@ export default function ProfileView() {
                 Add
               </button>
             </div>
+
+            {profile.suggestedRoles && profile.suggestedRoles.length > 0 && (
+              <div className="pt-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 mb-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>AI-Detected Relevant Roles from Resume (Click to Add):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.suggestedRoles
+                    .filter((r) => !profile.targetTitles.includes(r))
+                    .map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setProfile({ ...profile, targetTitles: [...profile.targetTitles, r] });
+                        }}
+                        className="text-[11px] px-2.5 py-1 rounded-lg border border-dashed border-indigo-300 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer"
+                      >
+                        + {r}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Skills */}
@@ -519,7 +554,7 @@ export default function ProfileView() {
                     addSkill();
                   }
                 }}
-                placeholder="Add skill (e.g. React, Next.js, Node.js, Python)"
+                placeholder="Add skill or technology"
                 className="flex-1 px-3.5 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl"
               />
               <button
@@ -530,6 +565,31 @@ export default function ProfileView() {
                 Add
               </button>
             </div>
+
+            {profile.suggestedTechnologies && profile.suggestedTechnologies.length > 0 && (
+              <div className="pt-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>AI-Detected Skills & Tools from Resume (Click to Add):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.suggestedTechnologies
+                    .filter((t) => !(profile.skills || []).includes(t))
+                    .map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setProfile({ ...profile, skills: [...(profile.skills || []), t] });
+                        }}
+                        className="text-[11px] px-2.5 py-1 rounded-lg border border-dashed border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 transition-colors cursor-pointer"
+                      >
+                        + {t}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

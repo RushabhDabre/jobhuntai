@@ -80,6 +80,9 @@ export interface UserProfile {
   noticePeriod: 'Immediate Joiner' | '15 Days' | '30 Days' | '60 Days' | '90 Days' | 'Serving Notice';
   preferredWorkMode: 'remote' | 'hybrid' | 'onsite' | 'any';
   skills: string[];
+  suggestedRoles?: string[];
+  suggestedTechnologies?: string[];
+  domainCategory?: string;
   resumeText: string;
   resumeFileName?: string;
   geminiApiKey?: string;

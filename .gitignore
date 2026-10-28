@@ -34,6 +34,8 @@ yarn-error.log*
 .env*
 !.env.example
 data/settings.json
+data/users.json
+data/sessions.json
 
 # vercel
 .vercel
