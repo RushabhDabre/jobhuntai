@@ -13,7 +13,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, jobs: [] });
     }
 
-    const jobs = await getJobs(userId);
+    const rawJobs = await getJobs(userId);
+    const jobs = rawJobs.filter((j) => {
+      const t = j.title.toLowerCase();
+      if (
+        t.includes('limited jobs') ||
+        t.includes('company jobs') ||
+        (t.endsWith(' jobs') && (j.description.includes('boilerplate') || j.description.includes('generic career portal')))
+      ) {
+        return false;
+      }
+      return true;
+    });
+
     return NextResponse.json({ success: true, jobs });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch jobs';

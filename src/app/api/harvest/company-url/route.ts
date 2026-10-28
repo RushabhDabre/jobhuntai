@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { scrapeCompanyCareerUrl } from '@/lib/services/companyScraper';
-import { upsertJob, getUserProfile } from '@/lib/storage';
+import { upsertJob, getUserProfile, getJobs, deleteJob } from '@/lib/storage';
 import { resolveAuthUser } from '@/lib/auth-server';
 import { Job } from '@/types/job';
 
@@ -25,6 +25,28 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
+    // Automatically remove any previously saved generic boilerplate placeholder jobs for this company
+    if (userId) {
+      try {
+        const existingJobs = await getJobs(userId);
+        for (const ej of existingJobs) {
+          const tLower = ej.title.toLowerCase();
+          const isGenericCard =
+            tLower.includes('limited jobs') ||
+            tLower.includes('company jobs') ||
+            tLower.endsWith(' jobs') ||
+            (ej.company.toLowerCase() === result.company.toLowerCase() && tLower.includes('jobs')) ||
+            (ej.title === 'Software Engineer' && ej.description.includes('Open career opportunities at'));
+
+          if (isGenericCard) {
+            await deleteJob(ej.id, userId);
+          }
+        }
+      } catch (cleanErr) {
+        console.warn('Could not clean previous placeholder jobs:', cleanErr);
+      }
+    }
+
     const now = new Date().toISOString();
     const savedJobs: Job[] = [];
 
@@ -36,7 +58,9 @@ export async function POST(req: Request) {
         company: partial.company || result.company || 'Target Company',
         location: partial.location || 'India / Remote',
         remoteType: partial.remoteType || 'unknown',
-        salary: partial.salary || 'Competitive / Market Standard',
+        salary: partial.salaryInLpa || partial.salary || 'Competitive / Market Standard',
+        salaryInLpa: partial.salaryInLpa,
+        experienceRequired: partial.experienceRequired || '3-6 years',
         url: partial.url || url,
         source: (partial.source as Job['source']) || 'company-website',
         description: partial.description || '',

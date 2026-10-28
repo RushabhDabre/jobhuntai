@@ -85,45 +85,38 @@ export async function matchJobWithResume(
   profile: UserProfile,
   customApiKey?: string
 ): Promise<MatchAnalysis> {
-  const prompt = `You are a Principal Tech Recruiter and Career Strategist specializing in the Indian Tech Industry (Bangalore, Pune, Hyderabad, Delhi-NCR, Mumbai, and Remote India).
-Evaluate how well this candidate matches the target job opening to help them LAND AN ACTUAL JOB.
+  const prompt = `You are a Senior Technical Recruiter evaluating candidate fit for a software engineering position in India.
+Evaluate the fit directly, crisply, and without boilerplate narrative essays.
 
-CANDIDATE PROFILE (INDIA MARKET):
-Name: ${profile.name}
-Current Location: ${profile.currentLocation}
-Preferred Locations in India: ${profile.preferredLocations?.join(', ') || 'Bengaluru, Pune, Hyderabad, Remote India'}
+CANDIDATE SKILLS & EXPERIENCE:
+Preferred Locations: ${profile.preferredLocations?.join(', ') || 'Bengaluru, Pune, Hyderabad, Remote India'}
 Years of Experience: ${profile.yearsOfExperience}
 Notice Period: ${profile.noticePeriod || '30 Days'}
-Current CTC: ${profile.currentCtc || 'Not specified'}
-Expected CTC: ${profile.expectedCtc || 'Not specified'}
-Target Roles: ${profile.targetTitles?.join(', ')}
 Key Skills: ${profile.skills?.join(', ')}
-Candidate Resume & Background:
-${profile.resumeText}
+Candidate Background:
+${profile.resumeText.slice(0, 3000)}
 
-TARGET JOB OPENING:
+TARGET ROLE:
 Title: ${job.title}
 Company: ${job.company}
 Location: ${job.location}
-Salary / CTC: ${job.salaryInLpa || job.salary || 'Market Standard'}
-Key Requirements: ${(job.requirements || []).join('; ')}
-Job Description:
-${job.description.slice(0, 4000)}
-
-Analyze with high rigor. Focus on actionable insights that help the candidate pass technical screening and get interview shortlists in India.
+Salary: ${job.salaryInLpa || job.salary || 'Market Standard'}
+Requirements: ${(job.requirements || []).join('; ')}
+Description:
+${job.description.slice(0, 3000)}
 
 Respond strictly in valid JSON matching this schema:
 {
   "score": number (0 to 100 integer representing candidate fit),
   "recommendation": "Strong Fit" | "Good Match" | "Borderline" | "Not Recommended",
-  "summary": "2-3 crisp sentences summarizing why the candidate is a viable match for this role",
-  "strengths": ["specific strength 1 relative to job description", "specific strength 2", ...],
-  "gaps": ["specific gap or missing requirement 1", ...],
-  "interviewTalkingPoints": ["tactical technical story or project from resume to highlight in screening round 1", "talking point 2"],
+  "summary": "1 single crisp bullet-style sentence stating direct match points (e.g. 'Strong overlap with your React & Spring Boot stack; favorable immediate joiner availability.'). NEVER mention third-person name, write directly as 'Strong match for your...'",
+  "strengths": ["top matching technical strength 1", "strength 2", "strength 3"],
+  "gaps": ["missing requirement or screening preparation point 1"],
+  "interviewTalkingPoints": ["key project or achievement from your resume to highlight"],
   "indiaRelevance": {
-    "locationFit": "analysis of location/remote fit (e.g. In candidate preferred city Bengaluru / Remote India)",
-    "salaryFit": "comparison with candidate expected CTC",
-    "noticePeriodFit": "whether candidate's notice period is favorable for this role"
+    "locationFit": "analysis of location/remote fit",
+    "salaryFit": "comparison with market standard",
+    "noticePeriodFit": "favorable immediate joining status"
   }
 }`;
 

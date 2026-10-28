@@ -403,15 +403,17 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
 
               {analysis ? (
                 <div className="space-y-5">
-                  {/* Summary */}
-                  <div className="bg-white dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-1">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-                      Executive Fit Summary
-                    </h4>
-                    <p className="text-sm text-zinc-700 dark:text-zinc-200 leading-relaxed font-normal">
-                      {analysis.summary}
-                    </p>
-                  </div>
+                  {/* Key Match Alignment */}
+                  {analysis.summary && !analysis.summary.toLowerCase().includes('generic career portal boilerplate') && (
+                    <div className="bg-white dark:bg-zinc-800/40 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-4 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <p className="text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 font-medium leading-relaxed">
+                        {analysis.summary}
+                      </p>
+                    </div>
+                  )}
 
                   {/* India Market Parameter Match */}
                   {analysis.indiaRelevance && (
