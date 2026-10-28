@@ -147,6 +147,70 @@ export async function findUserByEmail(email: string): Promise<UserRecord | null>
   return local.find((u) => u.email.toLowerCase() === normalized) || null;
 }
 
+export async function findUserById(id: string): Promise<UserRecord | null> {
+  if (!id) return null;
+
+  // 1. Cloudflare D1
+  if (isCloudflareD1Configured()) {
+    try {
+      const rows = await queryD1<{
+        id: string;
+        email: string;
+        password_hash: string;
+        name: string;
+        gemini_api_key?: string;
+        created_at: string;
+        updated_at: string;
+      }>('SELECT * FROM users WHERE id = ? LIMIT 1', [id]);
+
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        return {
+          id: r.id,
+          email: r.email,
+          passwordHash: r.password_hash,
+          name: r.name,
+          geminiApiKey: r.gemini_api_key || undefined,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        };
+      }
+      return null;
+    } catch (err) {
+      console.warn('D1 findUserById failed, checking fallback:', err);
+    }
+  }
+
+  // 2. Supabase
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (!error && data) {
+        return {
+          id: data.id,
+          email: data.email,
+          passwordHash: data.password_hash,
+          name: data.name,
+          geminiApiKey: data.gemini_api_key || undefined,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+        };
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  // 3. Local JSON fallback
+  const local = readLocalUsers();
+  return local.find((u) => u.id === id) || null;
+}
+
 export async function createUser(params: {
   email: string;
   passwordHash: string;

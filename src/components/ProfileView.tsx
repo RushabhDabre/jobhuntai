@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile } from '@/types/job';
-import { getAuthHeaders } from '@/lib/auth';
+import { getAuthHeaders, getStoredSession } from '@/lib/auth';
 import {
   User,
   Sparkles,
@@ -95,13 +95,23 @@ export default function ProfileView() {
     setUploadingResume(true);
     setUploadMessage(null);
 
+    const session = getStoredSession();
+    const userId = session?.id || profile?.userId || profile?.id;
+
     const formData = new FormData();
     formData.append('file', file);
+    if (userId) {
+      formData.append('userId', userId);
+    }
 
     try {
+      const headers = getAuthHeaders();
+      if (userId) {
+        headers['x-user-id'] = userId;
+      }
       const res = await fetch('/api/profile/upload-resume', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: formData,
       });
       const data = await res.json();

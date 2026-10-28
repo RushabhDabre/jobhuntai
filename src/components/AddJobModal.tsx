@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Sparkles, Loader2, Flame } from 'lucide-react';
 import { Job } from '@/types/job';
+import { getAuthHeaders } from '@/lib/auth';
 
 interface AddJobModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export default function AddJobModal({ isOpen, onClose, onJobAdded }: AddJobModal
       if (mode === 'url') {
         const res = await fetch('/api/harvest/firecrawl', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ url, autoScore }),
         });
         const data = await res.json();
@@ -45,7 +46,7 @@ export default function AddJobModal({ isOpen, onClose, onJobAdded }: AddJobModal
       } else {
         const res = await fetch('/api/jobs', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({
             title,
             company,

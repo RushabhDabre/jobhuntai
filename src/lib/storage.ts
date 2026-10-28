@@ -14,10 +14,11 @@ import {
   d1SaveAppSettings,
 } from './cloudflare-d1';
 import { getSupabaseClient, isSupabaseConfigured } from './supabase';
+import { findUserById } from './auth-storage';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const JOBS_FILE = path.join(DATA_DIR, 'jobs.json');
-const PROFILE_FILE = path.join(DATA_DIR, 'profile.json');
+const PROFILES_DIR = path.join(DATA_DIR, 'profiles');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
 function ensureDataDir() {
@@ -28,6 +29,18 @@ function ensureDataDir() {
       // In serverless environments, fs.mkdirSync may fail if read-only
     }
   }
+  if (!fs.existsSync(PROFILES_DIR)) {
+    try {
+      fs.mkdirSync(PROFILES_DIR, { recursive: true });
+    } catch {
+      // serverless fallback
+    }
+  }
+}
+
+function getLocalProfilePath(userId: string): string {
+  const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return path.join(PROFILES_DIR, `${safeId}.json`);
 }
 
 export function getStorageMode(): 'cloudflare-d1' | 'supabase' | 'local' {
@@ -39,34 +52,22 @@ export function getStorageMode(): 'cloudflare-d1' | 'supabase' | 'local' {
 const DEFAULT_PROFILE: UserProfile = {
   id: 'default_user',
   name: 'Candidate',
-  email: 'candidate@example.com',
-  phone: '+91 9876543210',
-  currentLocation: 'Pune, India',
-  preferredLocations: ['Pune', 'Mumbai', 'Hyderabad', 'Remote (India)'],
-  targetTitles: ['Software Developer', 'Fullstack Developer', 'Frontend Developer', 'React Developer'],
-  preferredTechnologies: ['React', 'JavaScript', 'Java', 'C#', '.NET', 'Python'],
-  yearsOfExperience: 2,
-  currentCtc: '₹7 LPA',
-  expectedCtc: '₹10 - ₹16 LPA',
+  email: undefined,
+  phone: undefined,
+  currentLocation: '',
+  preferredLocations: [],
+  targetTitles: [],
+  preferredTechnologies: [],
+  yearsOfExperience: 0,
+  currentCtc: '',
+  expectedCtc: '',
   noticePeriod: 'Immediate Joiner',
   preferredWorkMode: 'any',
-  skills: [
-    'React',
-    'JavaScript',
-    'TypeScript',
-    'Java',
-    'SQL',
-    'Node.js',
-    'REST APIs',
-    'Git',
-  ],
-  resumeText: `Candidate Summary
-Software Developer | Pune, Maharashtra | Notice: Immediate Joiner
-
-SUMMARY:
-2+ years of software development experience specializing in web applications using React, JavaScript, Java, and modern REST APIs. Hands-on experience developing frontends, working with relational databases, and debugging production issues.`,
+  skills: [],
+  resumeText: '',
+  resumeFileName: undefined,
   hasCompletedQuickSetup: false,
-  bioNotes: 'Looking for active vacancies in Pune, Mumbai, or Hyderabad.',
+  bioNotes: '',
   updatedAt: new Date().toISOString(),
 };
 
@@ -152,19 +153,19 @@ function profileFromDb(row: any): UserProfile {
   return {
     id: row.id || 'default_user',
     userId: row.id || 'default_user',
-    name: row.name || DEFAULT_PROFILE.name,
+    name: row.name || 'Candidate',
     email: row.email || undefined,
     phone: row.phone || undefined,
-    currentLocation: row.current_location || DEFAULT_PROFILE.currentLocation,
-    preferredLocations: Array.isArray(row.preferred_locations) ? row.preferred_locations : DEFAULT_PROFILE.preferredLocations,
-    targetTitles: Array.isArray(row.target_titles) ? row.target_titles : DEFAULT_PROFILE.targetTitles,
-    preferredTechnologies: Array.isArray(row.preferred_technologies) ? row.preferred_technologies : DEFAULT_PROFILE.preferredTechnologies,
-    yearsOfExperience: Number(row.years_of_experience) || 2,
-    currentCtc: row.current_ctc || DEFAULT_PROFILE.currentCtc,
-    expectedCtc: row.expected_ctc || DEFAULT_PROFILE.expectedCtc,
-    noticePeriod: row.notice_period || DEFAULT_PROFILE.noticePeriod,
+    currentLocation: row.current_location || '',
+    preferredLocations: Array.isArray(row.preferred_locations) ? row.preferred_locations : [],
+    targetTitles: Array.isArray(row.target_titles) ? row.target_titles : [],
+    preferredTechnologies: Array.isArray(row.preferred_technologies) ? row.preferred_technologies : [],
+    yearsOfExperience: Number(row.years_of_experience) || 0,
+    currentCtc: row.current_ctc || '',
+    expectedCtc: row.expected_ctc || '',
+    noticePeriod: row.notice_period || 'Immediate Joiner',
     preferredWorkMode: row.preferred_work_mode || 'any',
-    skills: Array.isArray(row.skills) ? row.skills : DEFAULT_PROFILE.skills,
+    skills: Array.isArray(row.skills) ? row.skills : [],
     resumeText: row.resume_text || '',
     resumeFileName: row.resume_file_name || undefined,
     geminiApiKey: row.gemini_api_key || undefined,
@@ -204,11 +205,15 @@ function profileToDb(p: UserProfile, userId?: string) {
 // JOBS API
 // ==========================================
 export async function getJobs(userId?: string): Promise<Job[]> {
+  if (!userId) {
+    return [];
+  }
+
   // 1. First Tier: Cloudflare D1 Serverless Database
   if (isCloudflareD1Configured()) {
     try {
       const d1Jobs = await d1GetJobs(userId);
-      if (Array.isArray(d1Jobs) && d1Jobs.length > 0) {
+      if (Array.isArray(d1Jobs)) {
         return d1Jobs;
       }
     } catch (err) {
@@ -220,13 +225,13 @@ export async function getJobs(userId?: string): Promise<Job[]> {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      let query = supabase.from('jobs').select('*').order('posted_at', { ascending: false });
-      if (userId) {
-        query = query.or(`user_id.eq.${userId},user_id.eq.default_user`);
-      }
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('posted_at', { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         return data.map(jobFromDb);
       }
     } catch (err) {
@@ -243,8 +248,7 @@ export async function getJobs(userId?: string): Promise<Job[]> {
     const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
     const parsed: Job[] = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    if (!userId) return parsed;
-    return parsed.filter((j) => !j.userId || j.userId === userId || j.userId === 'default_user');
+    return parsed.filter((j) => j.userId === userId);
   } catch {
     return [];
   }
@@ -280,12 +284,12 @@ export async function saveJobs(jobs: Job[], userId?: string): Promise<void> {
   }
 }
 
-export async function getJobById(id: string): Promise<Job | undefined> {
+export async function getJobById(id: string, userId?: string): Promise<Job | undefined> {
   // 1. Cloudflare D1
   if (isCloudflareD1Configured()) {
     try {
       const job = await d1GetJobById(id);
-      if (job) return job;
+      if (job && (!userId || !job.userId || job.userId === userId)) return job;
     } catch (err) {
       console.warn('Cloudflare D1 getJobById failed, falling back:', err);
     }
@@ -295,11 +299,11 @@ export async function getJobById(id: string): Promise<Job | undefined> {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .eq('id', id)
-        .single();
+      let query = supabase.from('jobs').select('*').eq('id', id);
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+      const { data, error } = await query.single();
       if (!error && data) {
         return jobFromDb(data);
       }
@@ -309,8 +313,16 @@ export async function getJobById(id: string): Promise<Job | undefined> {
   }
 
   // 3. Local JSON fallback
-  const jobs = await getJobs();
-  return jobs.find((j) => j.id === id);
+  ensureDataDir();
+  if (!fs.existsSync(JOBS_FILE)) return undefined;
+  try {
+    const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
+    const jobs: Job[] = JSON.parse(raw);
+    if (!Array.isArray(jobs)) return undefined;
+    return jobs.find((j) => j.id === id && (!userId || !j.userId || j.userId === userId));
+  } catch {
+    return undefined;
+  }
 }
 
 export async function upsertJob(job: Job, userId?: string): Promise<Job> {
@@ -370,7 +382,7 @@ export async function upsertJob(job: Job, userId?: string): Promise<Job> {
   return normalizedJob;
 }
 
-export async function deleteJob(id: string): Promise<boolean> {
+export async function deleteJob(id: string, userId?: string): Promise<boolean> {
   let deleted = false;
 
   // 1. Cloudflare D1
@@ -386,7 +398,11 @@ export async function deleteJob(id: string): Promise<boolean> {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const { error } = await supabase.from('jobs').delete().eq('id', id);
+      let query = supabase.from('jobs').delete().eq('id', id);
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+      const { error } = await query;
       if (!error) deleted = true;
     } catch {
       // fallback
@@ -400,7 +416,11 @@ export async function deleteJob(id: string): Promise<boolean> {
       const raw = fs.readFileSync(JOBS_FILE, 'utf-8');
       const jobs: Job[] = JSON.parse(raw);
       if (Array.isArray(jobs)) {
-        const filtered = jobs.filter((j) => j.id !== id);
+        const filtered = jobs.filter((j) => {
+          if (j.id !== id) return true;
+          if (userId && j.userId && j.userId !== userId) return true;
+          return false;
+        });
         if (filtered.length !== jobs.length) {
           fs.writeFileSync(JOBS_FILE, JSON.stringify(filtered, null, 2), 'utf-8');
           deleted = true;
@@ -419,6 +439,14 @@ export async function deleteJob(id: string): Promise<boolean> {
 // ==========================================
 export async function getUserProfile(userId?: string): Promise<UserProfile> {
   const targetId = userId || 'default_user';
+
+  if (!userId || userId === 'default_user') {
+    return {
+      ...DEFAULT_PROFILE,
+      id: targetId,
+      userId: targetId,
+    };
+  }
 
   // 1. Cloudflare D1
   if (isCloudflareD1Configured()) {
@@ -447,22 +475,40 @@ export async function getUserProfile(userId?: string): Promise<UserProfile> {
     }
   }
 
-  // 3. Local JSON fallback
+  // 3. Local isolated user JSON fallback
   ensureDataDir();
-  if (!fs.existsSync(PROFILE_FILE)) {
-    return { ...DEFAULT_PROFILE, id: targetId, userId: targetId };
+  const userProfileFile = getLocalProfilePath(targetId);
+  if (fs.existsSync(userProfileFile)) {
+    try {
+      const raw = fs.readFileSync(userProfileFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_PROFILE, ...parsed, id: targetId, userId: targetId };
+    } catch {
+      // continue
+    }
   }
+
+  // 4. Prepopulate from auth account if newly registered user
   try {
-    const raw = fs.readFileSync(PROFILE_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_PROFILE, ...parsed, id: targetId, userId: targetId };
+    const authUser = await findUserById(targetId);
+    if (authUser) {
+      return {
+        ...DEFAULT_PROFILE,
+        id: targetId,
+        userId: targetId,
+        name: authUser.name || 'Candidate',
+        email: authUser.email,
+      };
+    }
   } catch {
-    return { ...DEFAULT_PROFILE, id: targetId, userId: targetId };
+    // continue
   }
+
+  return { ...DEFAULT_PROFILE, id: targetId, userId: targetId };
 }
 
 export async function saveUserProfile(profile: Partial<UserProfile>, userId?: string): Promise<UserProfile> {
-  const targetId = userId || profile.email || profile.id || 'default_user';
+  const targetId = userId || profile.userId || profile.id || 'default_user';
   const current = await getUserProfile(targetId);
   const updated: UserProfile = {
     ...current,
@@ -492,12 +538,13 @@ export async function saveUserProfile(profile: Partial<UserProfile>, userId?: st
     }
   }
 
-  // 3. Local JSON fallback
+  // 3. Local JSON fallback - isolated per-user file
   ensureDataDir();
   try {
-    fs.writeFileSync(PROFILE_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    const userProfileFile = getLocalProfilePath(targetId);
+    fs.writeFileSync(userProfileFile, JSON.stringify(updated, null, 2), 'utf-8');
   } catch (err) {
-    console.warn('Could not write to local profile file (normal on read-only serverless):', err);
+    console.warn('Could not write to local user profile file:', err);
   }
 
   return updated;

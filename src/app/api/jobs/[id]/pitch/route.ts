@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getJobById, getUserProfile, upsertJob } from '@/lib/storage';
+import { resolveAuthUser } from '@/lib/auth-server';
 import { generatePitch } from '@/lib/services/gemini';
 import { parseApiError } from '@/lib/apiErrorHandler';
 
@@ -9,17 +10,18 @@ interface RouteContext {
 
 export async function POST(req: Request, context: RouteContext) {
   try {
+    const authUser = await resolveAuthUser(req);
     const { id } = await context.params;
-    const job = await getJobById(id);
+    const body = await req.json().catch(() => ({}));
+    const pitchType = body.pitchType || 'linkedin_dm';
+    const userId = authUser?.userId || req.headers.get('x-user-id') || body.userId || undefined;
+
+    const job = await getJobById(id, userId);
     if (!job) {
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const pitchType = body.pitchType || 'linkedin_dm';
-    const userId = req.headers.get('x-user-id') || body.userId || undefined;
     const profile = await getUserProfile(userId);
-
     const apiKey = body.apiKey || profile.geminiApiKey;
 
     const pitchText = await generatePitch(

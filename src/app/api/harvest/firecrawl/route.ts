@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { scrapeJobWithFirecrawl, crawlCareerPageWithFirecrawl } from '@/lib/services/firecrawl';
 import { upsertJob, getUserProfile } from '@/lib/storage';
+import { resolveAuthUser } from '@/lib/auth-server';
 import { matchJobWithResume } from '@/lib/services/gemini';
 import { parseApiError } from '@/lib/apiErrorHandler';
 import { Job } from '@/types/job';
 
 export async function POST(req: Request) {
   try {
+    const authUser = await resolveAuthUser(req);
     const body = await req.json();
+    const userId = authUser?.userId || req.headers.get('x-user-id') || body.userId || undefined;
+
     const { url, mode = 'scrape', autoScore = false, customApiKey } = body;
 
     if (!url) {
@@ -31,6 +35,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
     const newJob: Job = {
       id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      userId: userId,
       title: partialJob.title || 'Untitled Role',
       company: partialJob.company || 'Unknown Company',
       location: partialJob.location || 'Remote',
@@ -47,9 +52,9 @@ export async function POST(req: Request) {
       updatedAt: now,
     };
 
-    if (autoScore) {
+    if (autoScore && userId) {
       try {
-        const profile = await getUserProfile();
+        const profile = await getUserProfile(userId);
         const analysis = await matchJobWithResume(
           {
             title: newJob.title,
@@ -67,7 +72,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const saved = await upsertJob(newJob);
+    const saved = await upsertJob(newJob, userId);
     return NextResponse.json({ success: true, job: saved });
   } catch (error: unknown) {
     const formatted = parseApiError(error, 'Firecrawl');

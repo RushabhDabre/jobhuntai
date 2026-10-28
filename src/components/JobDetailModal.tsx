@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Job, JobStatus, MatchAnalysis } from '@/types/job';
 import { getSafeJobUrl, getPlatformSearchUrls } from '@/lib/jobLinks';
+import { getAuthHeaders } from '@/lib/auth';
 
 interface JobDetailModalProps {
   job: Job | null;
@@ -74,6 +75,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
     try {
       const res = await fetch(`/api/jobs/${job.id}/match`, {
         method: 'POST',
+        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (!data.success) {
@@ -104,7 +106,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
     try {
       const res = await fetch(`/api/jobs/${job.id}/pitch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ pitchType }),
       });
       const data = await res.json();
@@ -134,7 +136,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
     try {
       const res = await fetch(`/api/jobs/${job.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           status: localStatus,
           notes: localNotes,

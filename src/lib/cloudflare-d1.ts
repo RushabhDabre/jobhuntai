@@ -111,14 +111,13 @@ export function d1RowToJob(row: any): Job {
 }
 
 export async function d1GetJobs(userId?: string): Promise<Job[]> {
-  if (userId) {
-    const rows = await queryD1(
-      'SELECT * FROM jobs WHERE user_id = ? OR user_id = ? ORDER BY posted_at DESC',
-      [userId, 'default_user']
-    );
-    return rows.map(d1RowToJob);
+  if (!userId) {
+    return [];
   }
-  const rows = await queryD1('SELECT * FROM jobs ORDER BY posted_at DESC');
+  const rows = await queryD1(
+    'SELECT * FROM jobs WHERE user_id = ? ORDER BY posted_at DESC',
+    [userId]
+  );
   return rows.map(d1RowToJob);
 }
 
@@ -209,19 +208,19 @@ export function d1RowToProfile(row: any): UserProfile {
   return {
     id: row.id,
     userId: row.id,
-    name: row.name || 'Job Hunter',
+    name: row.name || 'Candidate',
     email: row.email || undefined,
     phone: row.phone || undefined,
-    currentLocation: row.current_location || 'Pune, India',
-    preferredLocations: safeParseArray<string>(row.preferred_locations, ['Pune', 'Mumbai', 'Hyderabad', 'Remote (India)']),
-    targetTitles: safeParseArray<string>(row.target_titles, ['Software Developer', 'Fullstack Developer', 'Frontend Developer', 'React Developer']),
-    preferredTechnologies: safeParseArray<string>(row.preferred_technologies, ['React', 'JavaScript', 'Java', 'C#', '.NET', 'Python']),
-    yearsOfExperience: Number(row.years_of_experience) || 2,
-    currentCtc: row.current_ctc || '₹7 LPA',
-    expectedCtc: row.expected_ctc || '₹10 - ₹16 LPA',
+    currentLocation: row.current_location || '',
+    preferredLocations: safeParseArray<string>(row.preferred_locations, []),
+    targetTitles: safeParseArray<string>(row.target_titles, []),
+    preferredTechnologies: safeParseArray<string>(row.preferred_technologies, []),
+    yearsOfExperience: Number(row.years_of_experience) || 0,
+    currentCtc: row.current_ctc || '',
+    expectedCtc: row.expected_ctc || '',
     noticePeriod: row.notice_period || 'Immediate Joiner',
     preferredWorkMode: row.preferred_work_mode || 'any',
-    skills: safeParseArray<string>(row.skills, ['React', 'JavaScript', 'TypeScript', 'C#', 'Java', 'SQL']),
+    skills: safeParseArray<string>(row.skills, []),
     resumeText: row.resume_text || '',
     resumeFileName: row.resume_file_name || undefined,
     geminiApiKey: row.gemini_api_key || undefined,
@@ -232,14 +231,9 @@ export function d1RowToProfile(row: any): UserProfile {
 }
 
 export async function d1GetUserProfile(userId?: string): Promise<UserProfile | null> {
-  const targetId = userId || 'default_user';
-  const rows = await queryD1('SELECT * FROM user_profile WHERE id = ? LIMIT 1', [targetId]);
+  if (!userId) return null;
+  const rows = await queryD1('SELECT * FROM user_profile WHERE id = ? LIMIT 1', [userId]);
   if (!rows || rows.length === 0) {
-    // If specific user not found, try default_user
-    if (targetId !== 'default_user') {
-      const defaultRows = await queryD1('SELECT * FROM user_profile WHERE id = ? LIMIT 1', ['default_user']);
-      if (defaultRows && defaultRows.length > 0) return d1RowToProfile(defaultRows[0]);
-    }
     return null;
   }
   return d1RowToProfile(rows[0]);

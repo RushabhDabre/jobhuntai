@@ -17,6 +17,7 @@ import {
   IndianRupee,
 } from 'lucide-react';
 import { Job } from '@/types/job';
+import { getAuthHeaders } from '@/lib/auth';
 
 interface HarvesterViewProps {
   onJobsImported: (jobs: Job[]) => void;
@@ -74,7 +75,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
     try {
       const res = await fetch('/api/harvest/ats', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           platform: atsPlatform,
           companySlug: atsSlug,
@@ -117,7 +118,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
     try {
       const res = await fetch('/api/harvest/apify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           provider: apifyProvider,
           actorId: apifyProvider === 'custom' ? apifyActorId : undefined,
@@ -169,7 +170,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
     try {
       const res = await fetch('/api/harvest/firecrawl', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           url: firecrawlUrl,
           mode: firecrawlMode,
@@ -219,7 +220,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
     try {
       const res = await fetch('/api/jobs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           title: manualTitle,
           company: manualCompany,

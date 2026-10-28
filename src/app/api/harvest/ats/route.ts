@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { harvestFromAts } from '@/lib/services/ats';
 import { upsertJob, getUserProfile } from '@/lib/storage';
+import { resolveAuthUser } from '@/lib/auth-server';
 import { matchJobWithResume } from '@/lib/services/gemini';
 import { Job } from '@/types/job';
 
 export async function POST(req: Request) {
   try {
+    const authUser = await resolveAuthUser(req);
     const body = await req.json();
+    const userId = authUser?.userId || req.headers.get('x-user-id') || body.userId || undefined;
+
     const { platform = 'greenhouse', companySlug, keywordFilter, limit = 10, autoScore = false } = body;
 
     if (!companySlug) {
@@ -21,12 +25,13 @@ export async function POST(req: Request) {
     });
 
     const now = new Date().toISOString();
-    const profile = autoScore ? await getUserProfile() : null;
+    const profile = autoScore && userId ? await getUserProfile(userId) : null;
     const savedJobs: Job[] = [];
 
     for (const raw of rawJobs) {
       const newJob: Job = {
         id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        userId: userId,
         title: raw.title || 'Untitled Role',
         company: raw.company || companySlug,
         location: raw.location || 'Unknown',
@@ -59,7 +64,7 @@ export async function POST(req: Request) {
         }
       }
 
-      savedJobs.push(await upsertJob(newJob));
+      savedJobs.push(await upsertJob(newJob, userId));
     }
 
     return NextResponse.json({

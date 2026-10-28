@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { getAppSettings, getUserProfile, saveUserProfile } from '@/lib/storage';
+import { resolveAuthUser } from '@/lib/auth-server';
 import { parseApiError } from '@/lib/apiErrorHandler';
 
 export async function POST(req: Request) {
   try {
+    const authUser = await resolveAuthUser(req);
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const userId = (formData.get('userId') as string) || req.headers.get('x-user-id') || undefined;
+    const userId = authUser?.userId || (formData.get('userId') as string) || req.headers.get('x-user-id') || undefined;
+
+    if (!userId || userId === 'default_user') {
+      return NextResponse.json({ success: false, error: 'Authentication required. Please sign in.' }, { status: 401 });
+    }
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
@@ -110,11 +116,11 @@ Be precise. Calculate yearsOfExperience from first professional role to present.
 
     const updatedProfile = await saveUserProfile(
       {
-        name: parsed.name || userProfile?.name || 'Candidate',
-        email: parsed.email || userProfile?.email || undefined,
+        name: parsed.name || authUser?.name || userProfile?.name || 'Candidate',
+        email: parsed.email || authUser?.email || userProfile?.email || undefined,
         phone: parsed.phone || userProfile?.phone || undefined,
-        currentLocation: parsed.currentLocation || userProfile?.currentLocation || 'Pune, India',
-        yearsOfExperience: Number(parsed.yearsOfExperience) || userProfile?.yearsOfExperience || 2,
+        currentLocation: parsed.currentLocation || userProfile?.currentLocation || '',
+        yearsOfExperience: Number(parsed.yearsOfExperience) || userProfile?.yearsOfExperience || 0,
         domainCategory: parsed.domainCategory || undefined,
         targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
           ? parsed.targetTitles

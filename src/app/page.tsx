@@ -47,11 +47,15 @@ export default function Home() {
       const jobsData = await jobsRes.json();
       if (jobsData.success && Array.isArray(jobsData.jobs)) {
         setJobs(jobsData.jobs);
+      } else {
+        setJobs([]);
       }
 
       const profileData = await profileRes.json();
       if (profileData.success && profileData.profile) {
         setProfile(profileData.profile);
+      } else {
+        setProfile(null);
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -101,6 +105,8 @@ export default function Home() {
   const handleAuthSuccess = (session: UserSession) => {
     setUserSession(session);
     saveSession(session);
+    setJobs([]);
+    setProfile(null);
     setIsLandingPage(false);
     setIsAuthOpen(false);
     fetchData(session.id);

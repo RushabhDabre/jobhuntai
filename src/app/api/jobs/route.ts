@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getJobs, upsertJob } from '@/lib/storage';
+import { resolveAuthUser } from '@/lib/auth-server';
 import { Job } from '@/types/job';
 
 export async function GET(req: Request) {
   try {
+    const authUser = await resolveAuthUser(req);
     const { searchParams } = new URL(req.url);
-    const userId = req.headers.get('x-user-id') || searchParams.get('userId') || undefined;
+    const userId = authUser?.userId || req.headers.get('x-user-id') || searchParams.get('userId') || undefined;
+
+    if (!userId || userId === 'default_user') {
+      return NextResponse.json({ success: true, jobs: [] });
+    }
+
     const jobs = await getJobs(userId);
     return NextResponse.json({ success: true, jobs });
   } catch (error: unknown) {
@@ -16,9 +23,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const authUser = await resolveAuthUser(req);
     const { searchParams } = new URL(req.url);
     const body = await req.json();
-    const userId = req.headers.get('x-user-id') || searchParams.get('userId') || body.userId || undefined;
+    const userId = authUser?.userId || req.headers.get('x-user-id') || searchParams.get('userId') || body.userId || undefined;
+
+    if (!userId || userId === 'default_user') {
+      return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
+    }
+
     const now = new Date().toISOString();
 
     // Check if it's a batch import
@@ -27,7 +40,7 @@ export async function POST(req: Request) {
       for (const item of body.jobs) {
         const job: Job = {
           id: item.id || `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          userId: item.userId || userId,
+          userId: userId,
           title: item.title || 'Untitled Role',
           company: item.company || 'Unknown Company',
           location: item.location || 'Remote',
@@ -59,7 +72,7 @@ export async function POST(req: Request) {
     // Single job creation
     const job: Job = {
       id: body.id || `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      userId: body.userId || userId,
+      userId: userId,
       title: body.title || 'Untitled Role',
       company: body.company || 'Unknown Company',
       location: body.location || 'Remote',
