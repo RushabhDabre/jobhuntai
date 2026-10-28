@@ -7,6 +7,8 @@ export type JobStatus =
   | 'rejected'
   | 'archived';
 
+export type AiProvider = 'gemini' | 'groq' | 'openrouter' | 'openai' | 'claude' | 'grok';
+
 export type JobSource =
   | 'firecrawl'
   | 'apify'
@@ -16,6 +18,10 @@ export type JobSource =
   | 'greenhouse'
   | 'lever'
   | 'ashby'
+  | 'company-careers'
+  | 'company-website'
+  | 'google-jobs'
+  | 'indeed'
   | 'manual';
 
 export interface MatchAnalysis {
@@ -54,6 +60,9 @@ export interface Job {
   status: JobStatus;
   matchScore?: number;
   matchAnalysis?: MatchAnalysis;
+  isUrgentHiring?: boolean;
+  noticePeriodAcceptable?: string;
+  matchReason?: string;
   coverLetter?: string;
   coldPitch?: string;
   linkedinDm?: string;
@@ -86,6 +95,13 @@ export interface UserProfile {
   resumeText: string;
   resumeFileName?: string;
   geminiApiKey?: string;
+  groqApiKey?: string;
+  openRouterApiKey?: string;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  grokApiKey?: string;
+  preferredAiProvider?: AiProvider;
+  autoFailover?: boolean;
   hasCompletedQuickSetup?: boolean;
   bioNotes?: string;
   updatedAt: string;
@@ -93,6 +109,13 @@ export interface UserProfile {
 
 export interface AppSettings {
   geminiApiKey?: string;
+  groqApiKey?: string;
+  openRouterApiKey?: string;
+  openaiApiKey?: string;
+  anthropicApiKey?: string;
+  grokApiKey?: string;
+  preferredAiProvider?: AiProvider;
+  autoFailover?: boolean;
   firecrawlApiKey?: string;
   apifyApiToken?: string;
   defaultGeminiModel?: string;

@@ -10,7 +10,7 @@ export interface FormattedApiError {
   rawMessage: string;
 }
 
-export function parseApiError(error: unknown, service: 'Gemini' | 'Firecrawl' | 'Apify'): FormattedApiError {
+export function parseApiError(error: unknown, service: 'Gemini' | 'Firecrawl' | 'Apify' | 'AI Service'): FormattedApiError {
   const err = error as { status?: number; code?: number | string; message?: string; name?: string };
   const rawMessage = (err?.message || String(error) || '').toLowerCase();
   const status = err?.status || (typeof err?.code === 'number' ? err.code : 0);

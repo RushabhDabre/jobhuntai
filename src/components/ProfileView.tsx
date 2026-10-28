@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile } from '@/types/job';
+import { UserProfile, AiProvider } from '@/types/job';
 import { getAuthHeaders, getStoredSession } from '@/lib/auth';
 import {
   User,
@@ -24,6 +24,10 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Zap,
+  Cpu,
+  Layers,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 const INDIAN_CITIES = [
@@ -99,10 +103,16 @@ export default function ProfileView() {
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
-    if (!profile?.geminiApiKey) {
+    const activeKey =
+      profile?.geminiApiKey?.trim() ||
+      profile?.groqApiKey?.trim() ||
+      profile?.openRouterApiKey?.trim() ||
+      profile?.openaiApiKey?.trim();
+
+    if (!activeKey) {
       setUploadMessage({
         type: 'error',
-        text: 'Please connect your personal Google Gemini API key in the section below before uploading a resume.',
+        text: 'Please connect at least one AI API key (Google Gemini, Groq, or OpenRouter) in the AI Engines section below before uploading a resume.',
       });
       return;
     }
@@ -115,7 +125,7 @@ export default function ProfileView() {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('apiKey', profile.geminiApiKey.trim());
+    formData.append('apiKey', activeKey);
     if (userId) {
       formData.append('userId', userId);
     }
@@ -334,19 +344,19 @@ export default function ProfileView() {
         </div>
       </div>
 
-      {/* Private Gemini AI Key Settings */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
+      {/* Private Multi-AI Engine & Failover Settings */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <Key className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <span>Personal Google Gemini API Key</span>
-                {profile.geminiApiKey ? (
+                <span>Personal AI Engines & Keys</span>
+                {(profile.geminiApiKey || profile.groqApiKey || profile.openRouterApiKey) ? (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Connected
+                    <ShieldCheck className="w-3 h-3" /> Ready
                   </span>
                 ) : (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
@@ -355,31 +365,73 @@ export default function ProfileView() {
                 )}
               </h2>
               <p className="text-xs text-zinc-500">
-                Each candidate connects their own free Gemini key for isolated AI parsing, evaluations, and pitch generation.
+                Connect your free AI keys. Automatic failover switches engines seamlessly if rate limits (429) or high demand (503) occur.
               </p>
             </div>
           </div>
 
-          <a
-            href="https://aistudio.google.com/app/apikey"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-          >
-            <span>Get Free Key at Google AI Studio</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={profile.autoFailover !== false}
+                onChange={(e) => setProfile({ ...profile, autoFailover: e.target.checked })}
+                className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <span className="flex items-center gap-1">
+                <ArrowRightLeft className="w-3 h-3 text-indigo-500" /> Auto-Failover
+              </span>
+            </label>
+          </div>
         </div>
 
-        <div className="space-y-2">
+        {/* Engine Priority Selector */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+            <Cpu className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Primary AI Provider:</span>
+          </label>
+          <select
+            value={profile.preferredAiProvider || 'gemini'}
+            onChange={(e) => setProfile({ ...profile, preferredAiProvider: e.target.value as AiProvider })}
+            className="text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 font-medium"
+          >
+            <option value="gemini">Google Gemini (Recommended, 1M context)</option>
+            <option value="groq">Groq Cloud (Free Llama 3.3 70B, 300+ tok/s)</option>
+            <option value="openrouter">OpenRouter (Free Tier Models)</option>
+            <option value="openai">OpenAI (GPT-4o-mini)</option>
+            <option value="claude">Anthropic (Claude 3.5 Haiku)</option>
+          </select>
+        </div>
+
+        {/* 1. Google Gemini Key */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Google Gemini Key</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                FREE
+              </span>
+            </label>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              <span>Get Free Key</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
           <div className="relative">
             <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               type={showApiKey ? 'text' : 'password'}
-              placeholder="AIzaSy... (Paste your free Gemini key here)"
+              placeholder="AIzaSy... (Paste Gemini key here)"
               value={profile.geminiApiKey || ''}
               onChange={(e) => setProfile({ ...profile, geminiApiKey: e.target.value.trim() })}
-              className="w-full text-xs sm:text-sm pl-9 pr-20 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-zinc-900 dark:text-zinc-100"
+              className="w-full text-xs pl-9 pr-20 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-zinc-900 dark:text-zinc-100"
             />
             <button
               type="button"
@@ -390,10 +442,75 @@ export default function ProfileView() {
               <span>{showApiKey ? 'Hide' : 'Show'}</span>
             </button>
           </div>
-          <p className="text-[11px] text-zinc-400">
-            🔒 <strong>Strict Account Isolation:</strong> Stored strictly in your personal user profile. Never shared with or used by any other account.
-          </p>
         </div>
+
+        {/* 2. Groq Key */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>Groq Cloud Key (Llama 3.3 70B)</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                FREE & ULTRA FAST
+              </span>
+            </label>
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400 hover:underline"
+            >
+              <span>console.groq.com</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+          <div className="relative">
+            <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="password"
+              placeholder="gsk_... (Paste free Groq key here)"
+              value={profile.groqApiKey || ''}
+              onChange={(e) => setProfile({ ...profile, groqApiKey: e.target.value.trim() })}
+              className="w-full text-xs pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono text-zinc-900 dark:text-zinc-100"
+            />
+          </div>
+        </div>
+
+        {/* 3. OpenRouter Key */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-purple-500" />
+              <span>OpenRouter Key</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                FREE MODELS
+              </span>
+            </label>
+            <a
+              href="https://openrouter.ai/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-600 dark:text-purple-400 hover:underline"
+            >
+              <span>openrouter.ai</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+          <div className="relative">
+            <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="password"
+              placeholder="sk-or-v1-... (Paste OpenRouter key here)"
+              value={profile.openRouterApiKey || ''}
+              onChange={(e) => setProfile({ ...profile, openRouterApiKey: e.target.value.trim() })}
+              className="w-full text-xs pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-zinc-900 dark:text-zinc-100"
+            />
+          </div>
+        </div>
+
+        <p className="text-[11px] text-zinc-400 pt-1">
+          🔒 <strong>Strict Account Isolation:</strong> All keys are stored strictly inside your personal user profile. Never shared with or used by any other candidate.
+        </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-8">

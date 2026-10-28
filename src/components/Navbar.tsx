@@ -19,8 +19,8 @@ import { UserProfile } from '@/types/job';
 import { UserSession } from '@/lib/auth';
 
 interface NavbarProps {
-  activeTab: 'feed' | 'pipeline' | 'harvester' | 'profile';
-  setActiveTab: (tab: 'feed' | 'pipeline' | 'harvester' | 'profile') => void;
+  activeTab: 'feed' | 'pipeline' | 'profile';
+  setActiveTab: (tab: 'feed' | 'pipeline' | 'profile') => void;
   openSettings: () => void;
   openAddJob: () => void;
   profile: UserProfile | null;
@@ -93,8 +93,8 @@ export default function Navbar({
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
               }`}
             >
-              <LayoutGrid className="w-4 h-4 text-indigo-500" />
-              <span>Matched Roles ({stats.total})</span>
+              <Search className="w-4 h-4 text-indigo-500" />
+              <span>Find & Scrape Jobs ({stats.total})</span>
             </button>
 
             <button
@@ -106,19 +106,7 @@ export default function Navbar({
               }`}
             >
               <Kanban className="w-4 h-4 text-blue-500" />
-              <span>Pipeline ({stats.appliedCount + stats.interviewCount})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('harvester')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeTab === 'harvester'
-                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-semibold'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-              }`}
-            >
-              <Search className="w-4 h-4 text-emerald-500" />
-              <span>Harvester</span>
+              <span>Applications & Tracker ({stats.appliedCount + stats.interviewCount})</span>
             </button>
 
             <button
@@ -130,7 +118,7 @@ export default function Navbar({
               }`}
             >
               <User className="w-4 h-4 text-purple-500" />
-              <span>Resume & Preferences</span>
+              <span>Resume & AI Keys</span>
             </button>
           </nav>
 
@@ -182,38 +170,30 @@ export default function Navbar({
         </div>
 
         {/* Mobile Navigation bar */}
-        <div className="flex md:hidden items-center justify-between py-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+        <div className="flex md:hidden items-center justify-around py-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
           <button
             onClick={() => setActiveTab('feed')}
-            className={`py-1 px-2 rounded-lg font-medium ${
-              activeTab === 'feed' ? 'text-indigo-600 font-bold' : 'text-zinc-500'
+            className={`py-1 px-3 rounded-lg font-medium ${
+              activeTab === 'feed' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
             }`}
           >
-            Feed
+            Find Jobs
           </button>
           <button
             onClick={() => setActiveTab('pipeline')}
-            className={`py-1 px-2 rounded-lg font-medium ${
-              activeTab === 'pipeline' ? 'text-indigo-600 font-bold' : 'text-zinc-500'
+            className={`py-1 px-3 rounded-lg font-medium ${
+              activeTab === 'pipeline' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
             }`}
           >
-            Pipeline
-          </button>
-          <button
-            onClick={() => setActiveTab('harvester')}
-            className={`py-1 px-2 rounded-lg font-medium ${
-              activeTab === 'harvester' ? 'text-indigo-600 font-bold' : 'text-zinc-500'
-            }`}
-          >
-            Harvester
+            Tracker
           </button>
           <button
             onClick={() => setActiveTab('profile')}
-            className={`py-1 px-2 rounded-lg font-medium ${
-              activeTab === 'profile' ? 'text-indigo-600 font-bold' : 'text-zinc-500'
+            className={`py-1 px-3 rounded-lg font-medium ${
+              activeTab === 'profile' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
             }`}
           >
-            Profile
+            Profile & Keys
           </button>
         </div>
       </div>

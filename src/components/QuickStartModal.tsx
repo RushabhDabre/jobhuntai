@@ -200,6 +200,8 @@ export default function QuickStartModal({
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isEditingKey, setIsEditingKey] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'groq' | 'openrouter'>('gemini');
+  const [noticePeriod, setNoticePeriod] = useState<string>('Immediate Joiner');
 
   // Domain selection state (defaults to DevOps, auto-switches on resume parse or pill click)
   const [activeDomainKey, setActiveDomainKey] = useState<string>('devops');
@@ -232,9 +234,22 @@ export default function QuickStartModal({
     if (profile) {
       if (profile.geminiApiKey) {
         setApiKeyInput(profile.geminiApiKey);
+        setSelectedProvider('gemini');
+        setIsEditingKey(false);
+      } else if (profile.groqApiKey) {
+        setApiKeyInput(profile.groqApiKey);
+        setSelectedProvider('groq');
+        setIsEditingKey(false);
+      } else if (profile.openRouterApiKey) {
+        setApiKeyInput(profile.openRouterApiKey);
+        setSelectedProvider('openrouter');
         setIsEditingKey(false);
       } else {
         setIsEditingKey(true);
+      }
+
+      if (profile.noticePeriod) {
+        setNoticePeriod(profile.noticePeriod);
       }
 
       if (profile.targetTitles && profile.targetTitles.length > 0) {
@@ -495,9 +510,14 @@ export default function QuickStartModal({
   // Submit preferences and launch job matching
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const activeKey = apiKeyInput.trim() || profile?.geminiApiKey;
+    const activeKey =
+      apiKeyInput.trim() ||
+      profile?.geminiApiKey ||
+      profile?.groqApiKey ||
+      profile?.openRouterApiKey;
+
     if (!activeKey) {
-      setUploadError('Please enter your Google Gemini API key in Step 1 to power your job matches.');
+      setUploadError('Please enter a free AI key (Gemini, Groq, or OpenRouter) in Step 1 to power your job matches.');
       return;
     }
 
@@ -508,14 +528,27 @@ export default function QuickStartModal({
 
     setIsSubmitting(true);
     try {
-      await onSaveProfile({
-        geminiApiKey: activeKey,
+      const updates: Partial<UserProfile> = {
         targetTitles: selectedRoles,
         preferredTechnologies: selectedTechs,
         preferredLocations: selectedLocations,
+        noticePeriod: (noticePeriod || 'Immediate Joiner') as UserProfile['noticePeriod'],
         domainCategory: detectedDomain || DOMAIN_PRESETS[activeDomainKey]?.label.replace(/^[^\w]+/, '').trim(),
         hasCompletedQuickSetup: true,
-      });
+      };
+
+      if (selectedProvider === 'groq') {
+        updates.groqApiKey = activeKey;
+        updates.preferredAiProvider = 'groq';
+      } else if (selectedProvider === 'openrouter') {
+        updates.openRouterApiKey = activeKey;
+        updates.preferredAiProvider = 'openrouter';
+      } else {
+        updates.geminiApiKey = activeKey;
+        updates.preferredAiProvider = 'gemini';
+      }
+
+      await onSaveProfile(updates);
 
       await onTriggerSearch(selectedRoles, selectedLocations);
       onClose();
@@ -527,7 +560,7 @@ export default function QuickStartModal({
   };
 
   const hasResume = Boolean(resumeUploadedName || profile?.resumeText);
-  const hasKey = Boolean(apiKeyInput.trim() || profile?.geminiApiKey);
+  const hasKey = Boolean(apiKeyInput.trim() || profile?.geminiApiKey || profile?.groqApiKey || profile?.openRouterApiKey);
 
   return (
     <dialog
@@ -548,7 +581,7 @@ export default function QuickStartModal({
               Setup Your AI Job Matching Engine
             </h2>
             <p className="text-xs text-zinc-500">
-              Connect your free Gemini key, pick your specialization or upload a resume, and discover live 48h vacancies.
+              Connect a free AI key, upload your resume or pick roles, and discover matching vacancies.
             </p>
           </div>
 
@@ -562,27 +595,85 @@ export default function QuickStartModal({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
-          {/* STEP 1: Connect Gemini API Key */}
-          <div className="space-y-2.5 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-800/20">
-            <div className="flex items-center justify-between">
+          {/* STEP 1: Connect Free AI Key */}
+          <div className="space-y-3 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-800/20">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Key className="w-4 h-4 text-amber-500" />
-                <span>1. Connect Your Google Gemini API Key</span>
+                <span>1. Connect Your Free AI API Key</span>
               </label>
 
               <a
-                href="https://aistudio.google.com/app/apikey"
+                href={
+                  selectedProvider === 'groq'
+                    ? 'https://console.groq.com/keys'
+                    : selectedProvider === 'openrouter'
+                    ? 'https://openrouter.ai/keys'
+                    : 'https://aistudio.google.com/app/apikey'
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
               >
-                <span>Get Free Key at Google AI Studio</span>
+                <span>
+                  {selectedProvider === 'groq'
+                    ? 'Get Free Key at Groq Console'
+                    : selectedProvider === 'openrouter'
+                    ? 'Get Free Key at OpenRouter'
+                    : 'Get Free Key at Google AI Studio'}
+                </span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             </div>
 
+            {/* Provider Switcher */}
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProvider('gemini');
+                  setIsEditingKey(true);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                  selectedProvider === 'gemini'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+                }`}
+              >
+                Google Gemini (Free)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProvider('groq');
+                  setIsEditingKey(true);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                  selectedProvider === 'groq'
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+                }`}
+              >
+                Groq Llama 3.3 (100% Free & Fast)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedProvider('openrouter');
+                  setIsEditingKey(true);
+                }}
+                className={`text-xs px-2.5 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                  selectedProvider === 'openrouter'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                    : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
+                }`}
+              >
+                OpenRouter (Free Tier)
+              </button>
+            </div>
+
             <p className="text-[11px] text-zinc-500">
-              Powers AI resume parsing, match scoring, and customized pitch generation. Free keys require <strong>zero billing</strong> and take 30 seconds to generate.
+              Powers AI resume parsing, match scoring, and customized pitch generation. Free keys require <strong>zero billing or credit card</strong> and take 30 seconds to generate.
             </p>
 
             {hasKey && !isEditingKey ? (
@@ -591,7 +682,7 @@ export default function QuickStartModal({
                   <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <div>
                     <p className="text-xs font-bold text-emerald-800 dark:text-emerald-200">
-                      ✓ Gemini API Key Connected
+                      ✓ AI Key Connected ({selectedProvider.toUpperCase()})
                     </p>
                     <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
                       Isolated exclusively to your private account.
@@ -612,7 +703,13 @@ export default function QuickStartModal({
                   <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input
                     type={showApiKey ? 'text' : 'password'}
-                    placeholder="AIzaSy... (Paste your free Gemini key here)"
+                    placeholder={
+                      selectedProvider === 'groq'
+                        ? 'gsk_... (Paste free Groq key here)'
+                        : selectedProvider === 'openrouter'
+                        ? 'sk-or-v1-... (Paste OpenRouter key here)'
+                        : 'AIzaSy... (Paste free Gemini key here)'
+                    }
                     value={apiKeyInput}
                     onChange={(e) => {
                       setApiKeyInput(e.target.value);
@@ -884,6 +981,46 @@ export default function QuickStartModal({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* STEP 6: Notice Period (Immediate Joiner Advantage) */}
+          <div className="space-y-2.5 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-200">
+                <span>⚡ 6. Current Notice Period (Recruiter Priority)</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300">
+                High Response Booster
+              </span>
+            </div>
+
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+              Indian companies actively prioritize candidates who can join within 15-20 days.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'Immediate Joiner', label: '⚡ Immediate Joiner (< 20 Days Left)' },
+                { id: '15 Days', label: '15 Days Notice' },
+                { id: '30 Days', label: '30 Days Notice' },
+                { id: '60 Days', label: '60 Days Notice' },
+                { id: '90 Days', label: '90 Days Notice' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setNoticePeriod(item.id)}
+                  className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer font-medium ${
+                    noticePeriod === item.id
+                      ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-xs'
+                      : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
+                  }`}
+                >
+                  {noticePeriod === item.id ? '✓ ' : ''}
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
 

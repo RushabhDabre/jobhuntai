@@ -17,7 +17,7 @@ import { UserSession, getStoredSession, logoutUser, saveSession, checkServerSess
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'feed' | 'pipeline' | 'harvester' | 'profile'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'pipeline' | 'profile'>('feed');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -339,6 +339,7 @@ export default function Home() {
                 onDeleteJob={handleDeleteJob}
                 onOpenQuickSetup={() => setIsQuickSetupOpen(true)}
                 onHarvestMatching={() => handleHarvestForProfile()}
+                onJobsImported={handleJobsImported}
               />
             )}
 
@@ -349,13 +350,6 @@ export default function Home() {
                 onUpdateStatus={handleUpdateStatus}
                 searchFilter=""
                 minScoreFilter={0}
-              />
-            )}
-
-            {activeTab === 'harvester' && (
-              <HarvesterView
-                onJobsImported={handleJobsImported}
-                openSettings={() => setIsSettingsOpen(true)}
               />
             )}
 

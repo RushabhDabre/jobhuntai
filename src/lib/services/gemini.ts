@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { Job, UserProfile, MatchAnalysis } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
+import { executeAiWithFailover } from './aiRouter';
 
 export function normalizeGeminiModel(model?: string): string {
   if (!model || model.startsWith('gemini-2.') || model.startsWith('gemini-1.') || model.includes('2.5-flash')) {
@@ -84,8 +85,6 @@ export async function matchJobWithResume(
   profile: UserProfile,
   customApiKey?: string
 ): Promise<MatchAnalysis> {
-  const { client, model } = await getGenAIClient(customApiKey);
-
   const prompt = `You are a Principal Tech Recruiter and Career Strategist specializing in the Indian Tech Industry (Bangalore, Pune, Hyderabad, Delhi-NCR, Mumbai, and Remote India).
 Evaluate how well this candidate matches the target job opening to help them LAND AN ACTUAL JOB.
 
@@ -129,20 +128,31 @@ Respond strictly in valid JSON matching this schema:
 }`;
 
   try {
-    const response = await generateContentWithRetry(client, model, {
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
+    const aiResult = await executeAiWithFailover({
+      prompt,
+      responseJson: true,
+      profile,
+      customKeys: {
+        gemini: customApiKey?.startsWith('AIza') ? customApiKey : undefined,
+        groq: customApiKey?.startsWith('gsk_') ? customApiKey : undefined,
       },
+      preferredProvider: profile.preferredAiProvider || 'gemini',
+      autoFailover: profile.autoFailover !== false,
     });
 
-    const text = response.text || '{}';
-    const parsed = JSON.parse(text);
+    const cleanJson = (aiResult.text || '{}').replace(/```json\n?|\n?```/g, '').trim();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      parsed = {};
+    }
 
     return {
-      score: Math.min(100, Math.max(0, Number(parsed.score) || 70)),
+      score: Math.min(100, Math.max(0, Number(parsed.score) || 72)),
       recommendation: parsed.recommendation || 'Good Match',
-      summary: parsed.summary || 'Profile evaluated against job criteria.',
+      summary: parsed.summary || (aiResult.didFailover ? `Profile evaluated via ${aiResult.provider} (${aiResult.model}).` : 'Profile evaluated against job criteria.'),
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
       gaps: Array.isArray(parsed.gaps) ? parsed.gaps : [],
       interviewTalkingPoints: Array.isArray(parsed.interviewTalkingPoints) ? parsed.interviewTalkingPoints : [],
@@ -154,7 +164,7 @@ Respond strictly in valid JSON matching this schema:
       evaluatedAt: new Date().toISOString(),
     };
   } catch (error: unknown) {
-    console.error('Gemini match error:', error);
+    console.error('AI match error:', error);
     throw error;
   }
 }
@@ -165,8 +175,6 @@ export async function generatePitch(
   pitchType: 'cover_letter' | 'cold_email' | 'linkedin_dm' = 'linkedin_dm',
   customApiKey?: string
 ): Promise<string> {
-  const { client, model } = await getGenAIClient(customApiKey);
-
   let styleGuide = '';
   if (pitchType === 'cover_letter') {
     styleGuide = 'Write a concise, compelling 3-paragraph tailored cover letter for Indian tech recruiters. Highlight years of experience, key tech stack match, and immediate notice period readiness.';
@@ -199,11 +207,18 @@ ${job.description.slice(0, 3000)}
 
 Output ONLY the exact text ready to send.`;
 
-  const response = await generateContentWithRetry(client, model, {
-    contents: prompt,
+  const aiResult = await executeAiWithFailover({
+    prompt,
+    profile,
+    customKeys: {
+      gemini: customApiKey?.startsWith('AIza') ? customApiKey : undefined,
+      groq: customApiKey?.startsWith('gsk_') ? customApiKey : undefined,
+    },
+    preferredProvider: profile.preferredAiProvider || 'gemini',
+    autoFailover: profile.autoFailover !== false,
   });
 
-  return response.text?.trim() || '';
+  return aiResult.text.trim();
 }
 
 export async function parseJobWithAI(

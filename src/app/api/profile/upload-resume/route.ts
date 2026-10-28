@@ -4,6 +4,7 @@ import { getAppSettings, getUserProfile, saveUserProfile } from '@/lib/storage';
 import { resolveAuthUser } from '@/lib/auth-server';
 import { parseApiError } from '@/lib/apiErrorHandler';
 import { normalizeGeminiModel, generateContentWithRetry } from '@/lib/services/gemini';
+import { executeAiWithFailover } from '@/lib/services/aiRouter';
 
 export async function POST(req: Request) {
   try {
@@ -22,21 +23,27 @@ export async function POST(req: Request) {
 
     const settings = await getAppSettings();
     const userProfile = userId ? await getUserProfile(userId) : null;
-    const bodyApiKey = (formData.get('apiKey') as string) || undefined;
-    const apiKey = bodyApiKey?.trim() || userProfile?.geminiApiKey?.trim();
+    const bodyApiKey = (formData.get('apiKey') as string)?.trim() || undefined;
 
-    if (!apiKey) {
+    const geminiKey = (bodyApiKey?.startsWith('AIza') ? bodyApiKey : userProfile?.geminiApiKey) || (!bodyApiKey?.startsWith('gsk_') && !bodyApiKey?.startsWith('sk-') ? bodyApiKey : undefined);
+    const groqKey = (bodyApiKey?.startsWith('gsk_') ? bodyApiKey : userProfile?.groqApiKey) || undefined;
+    const openRouterKey = (bodyApiKey?.startsWith('sk-or-') ? bodyApiKey : userProfile?.openRouterApiKey) || undefined;
+    const openaiKey = ((bodyApiKey?.startsWith('sk-') && !bodyApiKey?.startsWith('sk-or-')) ? bodyApiKey : userProfile?.openaiApiKey) || undefined;
+
+    const hasAnyKey = Boolean(geminiKey || groqKey || openRouterKey || openaiKey);
+
+    if (!hasAnyKey) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Please connect your personal Google Gemini API key first. Free keys are available at Google AI Studio with zero billing required.',
+          error: 'Please connect a free AI API key first (Google Gemini at Google AI Studio or Groq Cloud at console.groq.com).',
           isApiKeyMissing: true,
           formattedError: {
             isRateLimited: false,
             isExpired: false,
-            service: 'Gemini',
-            title: 'Gemini API Key Required',
-            message: 'Each user connects their own free Google Gemini API key to ensure private, isolated AI usage without sharing quotas.',
+            service: 'AI Service',
+            title: 'AI Engine Key Required',
+            message: 'Connect your free Gemini or Groq key to parse resumes and discover matching criteria.',
             resetTime: '',
             resetInMinutes: 0,
             suggestion: 'Enter your API key in Step 1 of the setup wizard or Settings.',
@@ -46,9 +53,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    const client = new GoogleGenAI({ apiKey });
-    const model = normalizeGeminiModel(settings.defaultGeminiModel);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -89,29 +93,49 @@ Extract all profile data into strict JSON with this exact structure:
 }
 Be precise. Calculate yearsOfExperience from first professional role to present.`;
 
-    const promptContents = [
-      {
-        text: systemPrompt,
-      },
-      {
-        inlineData: {
-          mimeType,
-          data: buffer.toString('base64'),
-        },
-      },
-    ];
-
-    const response = await generateContentWithRetry(client, model, {
-      contents: promptContents,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let parsed: any = {};
+    let parseText = '';
+
+    // If Gemini key is available, attempt native multimodal PDF parsing
+    if (geminiKey) {
+      try {
+        const client = new GoogleGenAI({ apiKey: geminiKey });
+        const model = normalizeGeminiModel(settings.defaultGeminiModel);
+        const promptContents = [
+          { text: systemPrompt },
+          { inlineData: { mimeType, data: buffer.toString('base64') } },
+        ];
+        const response = await generateContentWithRetry(client, model, {
+          contents: promptContents,
+          config: { responseMimeType: 'application/json' },
+        });
+        parseText = response.text || '';
+      } catch (geminiErr) {
+        console.warn('Gemini multimodal parse failed, attempting failover via text...', geminiErr);
+      }
+    }
+
+    // If Gemini was not used or failed, extract text buffer and execute via Multi-Engine AI router (Groq/OpenRouter/OpenAI)
+    if (!parseText) {
+      const extractedText = buffer.toString('utf-8', 0, 8000).replace(/[^\x20-\x7E\n\r\t]/g, ' ').trim();
+      const aiRes = await executeAiWithFailover({
+        prompt: `Please parse this candidate resume text into the requested JSON schema:\n\n${extractedText}`,
+        systemPrompt,
+        responseJson: true,
+        profile: userProfile,
+        customKeys: {
+          gemini: geminiKey,
+          groq: groqKey,
+          openrouter: openRouterKey,
+          openai: openaiKey,
+        },
+      });
+      parseText = aiRes.text;
+    }
+
     try {
-      const cleanJson = (response.text || '{}').replace(/```json\n?|\n?```/g, '').trim();
+      const cleanJson = (parseText || '{}').replace(/```json\n?|\n?```/g, '').trim();
       parsed = JSON.parse(cleanJson);
     } catch {
       parsed = {};
@@ -125,7 +149,10 @@ Be precise. Calculate yearsOfExperience from first professional role to present.
         currentLocation: parsed.currentLocation || userProfile?.currentLocation || '',
         yearsOfExperience: Number(parsed.yearsOfExperience) || userProfile?.yearsOfExperience || 0,
         domainCategory: parsed.domainCategory || undefined,
-        geminiApiKey: apiKey,
+        geminiApiKey: geminiKey || userProfile?.geminiApiKey,
+        groqApiKey: groqKey || userProfile?.groqApiKey,
+        openRouterApiKey: openRouterKey || userProfile?.openRouterApiKey,
+        openaiApiKey: openaiKey || userProfile?.openaiApiKey,
         targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
           ? parsed.targetTitles
           : Array.isArray(parsed.suggestedRoles) && parsed.suggestedRoles.length > 0
@@ -158,7 +185,7 @@ Be precise. Calculate yearsOfExperience from first professional role to present.
       message: `Successfully parsed and synced resume from ${file.name}`,
     });
   } catch (error: unknown) {
-    const formatted = parseApiError(error, 'Gemini');
+    const formatted = parseApiError(error, 'AI Service');
     return NextResponse.json({
       success: false,
       error: formatted.message,

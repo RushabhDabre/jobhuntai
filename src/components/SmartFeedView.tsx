@@ -3,13 +3,13 @@
 import React, { useState, useMemo } from 'react';
 import { Job, JobStatus, UserProfile } from '@/types/job';
 import { getSafeJobUrl } from '@/lib/jobLinks';
+import { getAuthHeaders } from '@/lib/auth';
 import {
   Sparkles,
   ExternalLink,
   Building2,
   MapPin,
   IndianRupee,
-  Briefcase,
   Clock,
   ArrowRight,
   Trash2,
@@ -17,7 +17,11 @@ import {
   Flame,
   CheckCircle2,
   UploadCloud,
-  FileText,
+  Search,
+  Globe,
+  Loader2,
+  AlertCircle,
+  Zap,
 } from 'lucide-react';
 
 interface SmartFeedViewProps {
@@ -28,6 +32,7 @@ interface SmartFeedViewProps {
   onDeleteJob: (jobId: string) => void;
   onOpenQuickSetup: () => void;
   onHarvestMatching?: () => void;
+  onJobsImported?: (jobs: Job[]) => void;
 }
 
 type FreshnessOption = '48h' | '7d' | '10d' | '30d' | 'all';
@@ -41,6 +46,15 @@ const STATUS_OPTIONS: { id: JobStatus; label: string }[] = [
   { id: 'rejected', label: 'Archived' },
 ];
 
+const POPULAR_COMPANIES = [
+  { name: 'Swiggy', url: 'https://jobs.lever.co/swiggy' },
+  { name: 'Razorpay', url: 'https://boards.greenhouse.io/razorpay' },
+  { name: 'CRED', url: 'https://boards.greenhouse.io/cred' },
+  { name: 'BrowserStack', url: 'https://jobs.ashbyhq.com/browserstack' },
+  { name: 'Zepto', url: 'https://jobs.lever.co/zepto' },
+  { name: 'Postman', url: 'https://boards.greenhouse.io/postman' },
+];
+
 export default function SmartFeedView({
   jobs,
   profile,
@@ -48,14 +62,103 @@ export default function SmartFeedView({
   onUpdateStatus,
   onDeleteJob,
   onOpenQuickSetup,
-  onHarvestMatching,
+  onJobsImported,
 }: SmartFeedViewProps) {
-  // Freshness filter: DEFAULT IS 48 HOURS!
+  // Scraper & Search Hub State
+  const [activeScrapeMode, setActiveScrapeMode] = useState<'company' | 'platforms'>('company');
+  const [companyUrlInput, setCompanyUrlInput] = useState('');
+  const [isScrapingCompany, setIsScrapingCompany] = useState(false);
+  const [companyScrapeMsg, setCompanyScrapeMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const [platformQuery, setPlatformQuery] = useState(profile?.targetTitles?.[0] || '');
+  const [platformLoc, setPlatformLoc] = useState(profile?.preferredLocations?.[0] || 'Bengaluru');
+  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'linkedin' | 'naukri' | 'indeed' | 'google-jobs'>('all');
+  const [immediateJoinerBoost, setImmediateJoinerBoost] = useState(true);
+  const [isSearchingPlatforms, setIsSearchingPlatforms] = useState(false);
+  const [platformSearchMsg, setPlatformSearchMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Freshness & Facet filters
   const [freshness, setFreshness] = useState<FreshnessOption>('48h');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [selectedTech, setSelectedTech] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [immediateOnlyFilter, setImmediateOnlyFilter] = useState(false);
+
+  // Handle Company Career URL Scraping
+  const handleScrapeCompany = async (urlToScrape?: string) => {
+    const targetUrl = (urlToScrape || companyUrlInput).trim();
+    if (!targetUrl) return;
+
+    setIsScrapingCompany(true);
+    setCompanyScrapeMsg(null);
+
+    try {
+      const res = await fetch('/api/harvest/company-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ url: targetUrl }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to scrape company website');
+      }
+
+      if (data.jobs && data.jobs.length > 0 && onJobsImported) {
+        onJobsImported(data.jobs);
+      }
+
+      setCompanyScrapeMsg({
+        type: 'success',
+        text: data.message || `Discovered ${data.jobs?.length || 0} open positions with match percentages!`,
+      });
+      setCompanyUrlInput('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Scraping failed';
+      setCompanyScrapeMsg({ type: 'error', text: msg });
+    } finally {
+      setIsScrapingCompany(false);
+    }
+  };
+
+  // Handle Cross-Platform Search (LinkedIn, Naukri, Indeed, Google Jobs)
+  const handlePlatformSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = platformQuery.trim() || profile?.targetTitles?.[0] || 'Software Engineer';
+    setIsSearchingPlatforms(true);
+    setPlatformSearchMsg(null);
+
+    try {
+      const res = await fetch('/api/jobs/search-platforms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          query,
+          location: platformLoc.trim() || 'India',
+          platform: selectedPlatform,
+          immediateOnly: immediateJoinerBoost,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Platform search failed');
+      }
+
+      if (data.jobs && data.jobs.length > 0 && onJobsImported) {
+        onJobsImported(data.jobs);
+      }
+
+      setPlatformSearchMsg({
+        type: 'success',
+        text: data.message || `Found ${data.jobs?.length || 0} matching roles!`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Search failed';
+      setPlatformSearchMsg({ type: 'error', text: msg });
+    } finally {
+      setIsSearchingPlatforms(false);
+    }
+  };
 
   // Calculate age of each job in hours
   const getJobAgeHours = (postedAtStr: string) => {
@@ -73,7 +176,7 @@ export default function SmartFeedView({
     return `${daysAgo} days ago`;
   };
 
-  // Filter jobs based on freshness, role, tech, location, query
+  // Filter jobs based on freshness, immediate joiner, role, tech, location, query
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
       const ageHours = getJobAgeHours(job.postedAt || job.createdAt);
@@ -83,6 +186,11 @@ export default function SmartFeedView({
       if (freshness === '7d' && ageHours > 7 * 24) return false;
       if (freshness === '10d' && ageHours > 10 * 24) return false;
       if (freshness === '30d' && ageHours > 30 * 24) return false;
+
+      // Immediate Joiner Filter
+      if (immediateOnlyFilter && !job.isUrgentHiring && (job.matchScore || 0) < 80) {
+        return false;
+      }
 
       // Role filter
       if (selectedRole !== 'all') {
@@ -126,18 +234,18 @@ export default function SmartFeedView({
 
       return true;
     });
-  }, [jobs, freshness, selectedRole, selectedTech, selectedLocation, searchQuery]);
+  }, [jobs, freshness, immediateOnlyFilter, selectedRole, selectedTech, selectedLocation, searchQuery]);
 
   // Counts for Freshness buttons
   const count48h = useMemo(() => jobs.filter((j) => getJobAgeHours(j.postedAt || j.createdAt) <= 48).length, [jobs]);
   const count7d = useMemo(() => jobs.filter((j) => getJobAgeHours(j.postedAt || j.createdAt) <= 7 * 24).length, [jobs]);
   const count10d = useMemo(() => jobs.filter((j) => getJobAgeHours(j.postedAt || j.createdAt) <= 10 * 24).length, [jobs]);
+  const countImmediate = useMemo(() => jobs.filter((j) => j.isUrgentHiring || (j.matchScore || 0) >= 80).length, [jobs]);
 
   const hasResume = Boolean(profile?.resumeText || profile?.resumeFileName);
-  const hasRoles = Boolean(profile?.targetTitles && profile.targetTitles.length > 0);
-  const hasLocations = Boolean(profile?.preferredLocations && profile.preferredLocations.length > 0);
+  const isImmediateCandidate = profile?.noticePeriod === 'Immediate Joiner' || profile?.noticePeriod === '15 Days';
 
-  // Dynamic distinct roles extracted from candidate's resume/profile + active jobs
+  // Distinct roles
   const dynamicRoles = useMemo(() => {
     const set = new Set<string>();
     if (profile?.targetTitles) {
@@ -153,7 +261,7 @@ export default function SmartFeedView({
     return Array.from(set);
   }, [profile, jobs]);
 
-  // Dynamic distinct technologies extracted from candidate's resume/profile + active jobs
+  // Distinct technologies
   const dynamicTechnologies = useMemo(() => {
     const set = new Set<string>();
     if (profile?.preferredTechnologies) {
@@ -173,7 +281,7 @@ export default function SmartFeedView({
     return Array.from(set);
   }, [profile, jobs]);
 
-  // Dynamic distinct locations from candidate preferences + active jobs
+  // Distinct locations
   const dynamicLocations = useMemo(() => {
     const set = new Set<string>();
     if (profile?.preferredLocations) {
@@ -188,67 +296,257 @@ export default function SmartFeedView({
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
-      {/* Search Preferences Summary Banner */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              Active Job Search Criteria
-            </span>
-            <span className="text-zinc-300 dark:text-zinc-700">•</span>
-            {hasResume ? (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{profile?.resumeFileName ? `Resume: ${profile.resumeFileName}` : 'Resume loaded'}</span>
+      {/* Immediate Notice Fast-Track Banner */}
+      {isImmediateCandidate && (
+        <div className="p-4 rounded-2xl border border-emerald-300 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white dark:from-emerald-950/40 dark:via-zinc-900 dark:to-zinc-900 flex items-start gap-3 shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-sm">
+            ⚡
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wider">
+                Immediate Joiner Fast-Track Active
               </span>
-            ) : (
-              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                No resume uploaded yet
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+                Notice: {profile?.noticePeriod || 'Immediate (< 20 Days)'}
               </span>
-            )}
-            {profile?.domainCategory && (
-              <>
-                <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  {profile.domainCategory}
-                </span>
-              </>
-            )}
+            </div>
+            <p className="text-xs text-emerald-800 dark:text-emerald-300/90 mt-0.5">
+              Companies actively prefer candidates who can join within 15-20 days. Your AI match pitches will automatically highlight your immediate availability to jump to the top of recruiter inboxes.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* WEB SCRAPER & JOB SEARCH HUB */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+        {/* Hub Mode Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <Search className="w-4 h-4 text-indigo-500" />
+              <span>Job Discovery & Web Scraper Engine</span>
+            </h2>
+            <p className="text-xs text-zinc-500">
+              Scrape relevant jobs from any company website or search live across LinkedIn, Naukri, and Indeed
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-700 dark:text-zinc-300 font-medium">
-            <span>
-              🎯 Roles: <strong>{hasRoles ? profile!.targetTitles.slice(0, 3).join(', ') : 'Not set yet (Upload resume to detect)'}</strong>
-            </span>
-            <span>
-              📍 Cities: <strong>{hasLocations ? profile!.preferredLocations.join(', ') : 'Any / Not set'}</strong>
-            </span>
-            <span>
-              ⏳ Notice: <strong>{hasResume ? (profile?.noticePeriod || 'Immediate Joiner') : 'Not set'}</strong>
-            </span>
+          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setActiveScrapeMode('company')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                activeScrapeMode === 'company'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Paste Company Link</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveScrapeMode('platforms')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                activeScrapeMode === 'platforms'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Search All Job Platforms</span>
+            </button>
           </div>
         </div>
 
-        <button
-          onClick={onOpenQuickSetup}
-          className={`self-start sm:self-auto flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 shadow-xs ${
-            hasResume
-              ? 'border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
-          }`}
-        >
-          {hasResume ? (
-            <>
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Edit Preferences & Resume</span>
-            </>
-          ) : (
-            <>
-              <UploadCloud className="w-4 h-4" />
-              <span>Upload Resume to Set Preferences</span>
-            </>
-          )}
-        </button>
+        {/* MODE 1: Paste Any Company Career Link */}
+        {activeScrapeMode === 'company' && (
+          <div className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleScrapeCompany();
+              }}
+              className="space-y-3"
+            >
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Paste Company Website or Career Page URL
+              </label>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Globe className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="url"
+                    placeholder="e.g. https://careers.swiggy.com or boards.greenhouse.io/razorpay"
+                    value={companyUrlInput}
+                    onChange={(e) => {
+                      setCompanyUrlInput(e.target.value);
+                      setCompanyScrapeMsg(null);
+                    }}
+                    className="w-full text-xs sm:text-sm pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isScrapingCompany || !companyUrlInput.trim()}
+                  className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+                >
+                  {isScrapingCompany ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Scraping Website...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      <span>Scrape Company Jobs</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Status Message */}
+              {companyScrapeMsg && (
+                <div
+                  className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                    companyScrapeMsg.type === 'success'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                  }`}
+                >
+                  {companyScrapeMsg.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{companyScrapeMsg.text}</span>
+                </div>
+              )}
+            </form>
+
+            {/* Quick Presets */}
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <span className="text-[11px] font-semibold text-zinc-500 mr-2">Quick 1-Click Company Scrape:</span>
+              <div className="inline-flex flex-wrap gap-1.5 mt-1 sm:mt-0">
+                {POPULAR_COMPANIES.map((comp) => (
+                  <button
+                    key={comp.name}
+                    type="button"
+                    onClick={() => {
+                      setCompanyUrlInput(comp.url);
+                      handleScrapeCompany(comp.url);
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-indigo-400 dark:hover:border-indigo-600 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    + {comp.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODE 2: Search Across All Job Platforms */}
+        {activeScrapeMode === 'platforms' && (
+          <form onSubmit={handlePlatformSearch} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Job Role / Skill Keyword
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. DevOps Engineer, SAP ABAP, React"
+                  value={platformQuery}
+                  onChange={(e) => setPlatformQuery(e.target.value)}
+                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Target Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Pune, Bengaluru, Remote"
+                  value={platformLoc}
+                  onChange={(e) => setPlatformLoc(e.target.value)}
+                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Platform
+                </label>
+                <select
+                  value={selectedPlatform}
+                  onChange={(e) => setSelectedPlatform(e.target.value as 'all' | 'linkedin' | 'naukri' | 'indeed' | 'google-jobs')}
+                  className="w-full text-xs sm:text-sm px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-zinc-100"
+                >
+                  <option value="all">All Platforms (LinkedIn + Naukri + Indeed)</option>
+                  <option value="linkedin">LinkedIn Jobs</option>
+                  <option value="indeed">Indeed India</option>
+                  <option value="google-jobs">Google Jobs</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={immediateJoinerBoost}
+                  onChange={(e) => setImmediateJoinerBoost(e.target.checked)}
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+                <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold">
+                  <Zap className="w-3.5 h-3.5" /> Boost Roles Prioritizing Immediate Joiners (&lt; 20 Days)
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={isSearchingPlatforms || !platformQuery.trim()}
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+              >
+                {isSearchingPlatforms ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Searching Platforms...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>Search Across Platforms</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {platformSearchMsg && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  platformSearchMsg.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                }`}
+              >
+                {platformSearchMsg.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{platformSearchMsg.text}</span>
+              </div>
+            )}
+          </form>
+        )}
       </div>
 
       {/* FILTER CONTROL BAR */}
@@ -258,10 +556,10 @@ export default function SmartFeedView({
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Filter by Vacancy Date (Default: Last 48 Hours)</span>
+              <span>Vacancy Recency & Urgent Filter</span>
             </span>
             <span className="text-xs text-zinc-400">
-              Showing <strong>{filteredJobs.length}</strong> matching vacancies
+              Showing <strong>{filteredJobs.length}</strong> matching roles
             </span>
           </div>
 
@@ -290,28 +588,6 @@ export default function SmartFeedView({
             </button>
 
             <button
-              onClick={() => setFreshness('10d')}
-              className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer ${
-                freshness === '10d'
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-bold'
-                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
-              }`}
-            >
-              Last 10 Days ({count10d})
-            </button>
-
-            <button
-              onClick={() => setFreshness('30d')}
-              className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer ${
-                freshness === '30d'
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-bold'
-                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
-              }`}
-            >
-              Last 30 Days
-            </button>
-
-            <button
               onClick={() => setFreshness('all')}
               className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer ${
                 freshness === 'all'
@@ -321,6 +597,19 @@ export default function SmartFeedView({
             >
               All Openings ({jobs.length})
             </button>
+
+            {/* Immediate Joiner Toggle Pill */}
+            <button
+              onClick={() => setImmediateOnlyFilter(!immediateOnlyFilter)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border transition-all cursor-pointer ${
+                immediateOnlyFilter
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs font-bold'
+                  : 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 hover:border-amber-400'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>⚡ Immediate Joiners Priority ({countImmediate})</span>
+            </button>
           </div>
         </div>
 
@@ -329,7 +618,7 @@ export default function SmartFeedView({
           {/* Role Filter */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
-              Role Preference
+              Role Filter
             </label>
             <select
               value={selectedRole}
@@ -337,7 +626,7 @@ export default function SmartFeedView({
               className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100"
             >
               <option value="all">
-                {dynamicRoles.length === 0 ? 'All Roles (Upload resume to customize)' : 'All Roles'}
+                {dynamicRoles.length === 0 ? 'All Roles' : 'All Roles'}
               </option>
               {dynamicRoles.map((role) => (
                 <option key={role} value={role}>{role}</option>
@@ -348,7 +637,7 @@ export default function SmartFeedView({
           {/* Technology Filter */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
-              Technology Stack
+              Technology Filter
             </label>
             <select
               value={selectedTech}
@@ -356,10 +645,10 @@ export default function SmartFeedView({
               className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100"
             >
               <option value="all">
-                {dynamicTechnologies.length === 0 ? 'All Technologies (Upload resume to customize)' : 'All Technologies'}
+                {dynamicTechnologies.length === 0 ? 'All Technologies' : 'All Technologies'}
               </option>
-              {dynamicTechnologies.map((tech) => (
-                <option key={tech} value={tech}>{tech}</option>
+              {dynamicTechnologies.map((t) => (
+                <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </div>
@@ -367,93 +656,66 @@ export default function SmartFeedView({
           {/* Location Filter */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">
-              Location (City)
+              Location Filter
             </label>
             <select
               value={selectedLocation}
               onChange={(e) => setSelectedLocation(e.target.value)}
               className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">All Locations</option>
+              <option value="all">
+                {dynamicLocations.length === 0 ? 'All Locations' : 'All Locations'}
+              </option>
               {dynamicLocations.map((loc) => (
                 <option key={loc} value={loc}>{loc}</option>
               ))}
             </select>
           </div>
         </div>
+
+        {/* ROW 3: Keyword Search */}
+        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search by title, company, or keyword..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full text-xs pl-10 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+            />
+          </div>
+
+          <button
+            onClick={onOpenQuickSetup}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Edit Profile</span>
+          </button>
+        </div>
       </div>
 
-      {/* VACANCY CARDS LIST */}
+      {/* JOB CARDS LIST */}
       <div className="space-y-4">
         {filteredJobs.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-12 text-center">
-            {!hasResume ? (
-              <div className="max-w-md mx-auto space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
-                  <UploadCloud className="w-6 h-6" />
-                </div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Upload Your Resume to Get Started
-                </h3>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  No pre-approved or dummy data is used. Upload your resume (PDF/DOCX) to let the AI discover your exact specialization (DevOps, SAP, Fullstack, Cloud, QA, Mobile, etc.) and generate relevant job roles & tech criteria.
-                </p>
-                <div className="pt-2">
-                  <button
-                    onClick={onOpenQuickSetup}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Upload Resume & Set Preferences</span>
-                  </button>
-                </div>
-              </div>
-            ) : jobs.length === 0 ? (
-              <div className="max-w-md mx-auto space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Profile Configured: {profile?.domainCategory || profile?.targetTitles?.[0] || 'Active Candidate'}
-                </h3>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  Your search preferences are customized from your resume ({profile?.targetTitles?.join(', ') || 'No titles selected'}). Click below to harvest live openings directly matching your background.
-                </p>
-                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-                  {onHarvestMatching && (
-                    <button
-                      onClick={onHarvestMatching}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Fetch Live Vacancies Now</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={onOpenQuickSetup}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>Adjust Preferences</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="max-w-md mx-auto space-y-3">
-                <Clock className="w-10 h-10 mx-auto text-zinc-400" />
-                <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
-                  No vacancies found in this time window
-                </h3>
-                <p className="text-xs text-zinc-500">
-                  You are currently filtering for <strong>{freshness === '48h' ? 'Last 48 Hours' : freshness}</strong>. Click &quot;All Openings&quot; above to see all {jobs.length} active openings.
-                </p>
-                <button
-                  onClick={() => setFreshness('all')}
-                  className="mt-2 text-xs font-semibold px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
-                >
-                  View All Openings ({jobs.length})
-                </button>
-              </div>
+          <div className="p-12 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mx-auto">
+              <Search className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              No matching vacancies found for current filter
+            </h3>
+            <p className="text-xs text-zinc-500 max-w-md mx-auto">
+              Paste a company career URL above, search across platforms, or expand your filter to &quot;All Openings&quot;.
+            </p>
+            {freshness !== 'all' && (
+              <button
+                onClick={() => setFreshness('all')}
+                className="mt-2 text-xs font-semibold px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+              >
+                View All Openings ({jobs.length})
+              </button>
             )}
           </div>
         ) : (
@@ -469,30 +731,40 @@ export default function SmartFeedView({
               >
                 {/* Left Column: Job Info */}
                 <div className="space-y-3 flex-1">
-                  {/* Freshness Badge & Platform Tag */}
+                  {/* Badges: Freshness, Match %, Urgent Hiring */}
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Relevance Score in % */}
+                    {job.matchScore !== undefined && (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 px-2.5 py-0.5 rounded-full">
+                        <Sparkles className="w-3 h-3 text-indigo-500" />
+                        {job.matchScore}% Match
+                      </span>
+                    )}
+
+                    {/* Urgent / Immediate Joiner Badge */}
+                    {(job.isUrgentHiring || isImmediateCandidate) && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                        <Zap className="w-3 h-3 text-amber-500" />
+                        Immediate Joiner Priority
+                      </span>
+                    )}
+
+                    {/* Freshness Badge */}
                     {isWithin48h ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                         <Flame className="w-3.5 h-3.5 text-emerald-500" />
-                        ⚡ Added {formatAgeText(job.postedAt || job.createdAt)}
+                        ⚡ {formatAgeText(job.postedAt || job.createdAt)}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                         <Clock className="w-3 h-3 text-zinc-400" />
-                        Added {formatAgeText(job.postedAt || job.createdAt)}
+                        {formatAgeText(job.postedAt || job.createdAt)}
                       </span>
                     )}
 
                     <span className="text-[11px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                       {job.source}
                     </span>
-
-                    {job.matchScore !== undefined && (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-0.5 rounded-full">
-                        <Sparkles className="w-3 h-3" />
-                        {job.matchScore}% Match
-                      </span>
-                    )}
                   </div>
 
                   {/* Role Title */}
@@ -546,11 +818,11 @@ export default function SmartFeedView({
                     </div>
                   )}
 
-                  {/* AI Match snippet */}
-                  {job.matchAnalysis && (
+                  {/* Match Reason Breakdown */}
+                  {(job.matchReason || job.matchAnalysis?.summary) && (
                     <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                      <strong className="text-indigo-600 dark:text-indigo-400">Match Reason: </strong>
-                      {job.matchAnalysis.summary}
+                      <strong className="text-indigo-600 dark:text-indigo-400 font-semibold">Semantic Match: </strong>
+                      {job.matchReason || job.matchAnalysis?.summary}
                     </p>
                   )}
                 </div>
@@ -588,7 +860,7 @@ export default function SmartFeedView({
                       onClick={() => onSelectJob(job)}
                       className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer"
                     >
-                      <span>AI Review</span>
+                      <span>Pitch & Details</span>
                       <ArrowRight className="w-3 h-3" />
                     </button>
 
