@@ -16,6 +16,8 @@ import {
   SlidersHorizontal,
   Flame,
   CheckCircle2,
+  UploadCloud,
+  FileText,
 } from 'lucide-react';
 
 interface SmartFeedViewProps {
@@ -129,40 +131,121 @@ export default function SmartFeedView({
   const count7d = useMemo(() => jobs.filter((j) => getJobAgeHours(j.postedAt || j.createdAt) <= 7 * 24).length, [jobs]);
   const count10d = useMemo(() => jobs.filter((j) => getJobAgeHours(j.postedAt || j.createdAt) <= 10 * 24).length, [jobs]);
 
+  const hasResume = Boolean(profile?.resumeText || profile?.resumeFileName);
+  const hasRoles = Boolean(profile?.targetTitles && profile.targetTitles.length > 0);
+  const hasLocations = Boolean(profile?.preferredLocations && profile.preferredLocations.length > 0);
+
+  // Dynamic distinct roles extracted from candidate's resume/profile + active jobs
+  const dynamicRoles = useMemo(() => {
+    const set = new Set<string>();
+    if (profile?.targetTitles) {
+      profile.targetTitles.forEach((t) => t && set.add(t));
+    }
+    if (profile?.suggestedRoles) {
+      profile.suggestedRoles.forEach((r) => r && set.add(r));
+    }
+    jobs.forEach((j) => {
+      if (j.roleCategory) set.add(j.roleCategory);
+      if (j.title) set.add(j.title);
+    });
+    return Array.from(set);
+  }, [profile, jobs]);
+
+  // Dynamic distinct technologies extracted from candidate's resume/profile + active jobs
+  const dynamicTechnologies = useMemo(() => {
+    const set = new Set<string>();
+    if (profile?.preferredTechnologies) {
+      profile.preferredTechnologies.forEach((t) => t && set.add(t));
+    }
+    if (profile?.suggestedTechnologies) {
+      profile.suggestedTechnologies.forEach((t) => t && set.add(t));
+    }
+    if (profile?.skills) {
+      profile.skills.forEach((s) => s && set.add(s));
+    }
+    jobs.forEach((j) => {
+      if (Array.isArray(j.technologies)) {
+        j.technologies.forEach((t) => t && set.add(t));
+      }
+    });
+    return Array.from(set);
+  }, [profile, jobs]);
+
+  // Dynamic distinct locations from candidate preferences + active jobs
+  const dynamicLocations = useMemo(() => {
+    const set = new Set<string>();
+    if (profile?.preferredLocations) {
+      profile.preferredLocations.forEach((l) => l && set.add(l));
+    }
+    jobs.forEach((j) => {
+      if (j.city) set.add(j.city);
+      else if (j.location) set.add(j.location);
+    });
+    return Array.from(set);
+  }, [profile, jobs]);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
       {/* Search Preferences Summary Banner */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Active Job Search Criteria
             </span>
             <span className="text-zinc-300 dark:text-zinc-700">•</span>
-            <span className="text-xs text-zinc-500">
-              {profile?.resumeFileName ? `Resume: ${profile.resumeFileName}` : 'Resume loaded'}
-            </span>
+            {hasResume ? (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{profile?.resumeFileName ? `Resume: ${profile.resumeFileName}` : 'Resume loaded'}</span>
+              </span>
+            ) : (
+              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                No resume uploaded yet
+              </span>
+            )}
+            {profile?.domainCategory && (
+              <>
+                <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  {profile.domainCategory}
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-700 dark:text-zinc-300 font-medium">
             <span>
-              🎯 Roles: <strong>{profile?.targetTitles?.slice(0, 3).join(', ') || 'Software / React Developer'}</strong>
+              🎯 Roles: <strong>{hasRoles ? profile!.targetTitles.slice(0, 3).join(', ') : 'Not set yet (Upload resume to detect)'}</strong>
             </span>
             <span>
-              📍 Cities: <strong>{profile?.preferredLocations?.join(', ') || 'Pune, Mumbai, Hyderabad'}</strong>
+              📍 Cities: <strong>{hasLocations ? profile!.preferredLocations.join(', ') : 'Any / Not set'}</strong>
             </span>
             <span>
-              ⏳ Notice: <strong>{profile?.noticePeriod || '30 Days'}</strong>
+              ⏳ Notice: <strong>{hasResume ? (profile?.noticePeriod || 'Immediate Joiner') : 'Not set'}</strong>
             </span>
           </div>
         </div>
 
         <button
           onClick={onOpenQuickSetup}
-          className="self-start sm:self-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer shrink-0"
+          className={`self-start sm:self-auto flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 shadow-xs ${
+            hasResume
+              ? 'border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+          }`}
         >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>Edit Preferences & Resume</span>
+          {hasResume ? (
+            <>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Edit Preferences & Resume</span>
+            </>
+          ) : (
+            <>
+              <UploadCloud className="w-4 h-4" />
+              <span>Upload Resume to Set Preferences</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -249,14 +332,14 @@ export default function SmartFeedView({
             <select
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2"
+              className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">All Roles</option>
-              <option value="Software Developer">Software Developer</option>
-              <option value="Frontend Developer">Frontend Developer</option>
-              <option value="Fullstack Developer">Fullstack Developer</option>
-              <option value="React Developer">React Developer</option>
-              <option value="Backend Developer">Backend Developer</option>
+              <option value="all">
+                {dynamicRoles.length === 0 ? 'All Roles (Upload resume to customize)' : 'All Roles'}
+              </option>
+              {dynamicRoles.map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
             </select>
           </div>
 
@@ -268,16 +351,14 @@ export default function SmartFeedView({
             <select
               value={selectedTech}
               onChange={(e) => setSelectedTech(e.target.value)}
-              className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2"
+              className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">All Technologies</option>
-              <option value="React">React</option>
-              <option value="Java">Java</option>
-              <option value="C#">C# / .NET</option>
-              <option value="Python">Python</option>
-              <option value="Node.js">Node.js</option>
-              <option value="TypeScript">TypeScript</option>
-              <option value="SQL">SQL</option>
+              <option value="all">
+                {dynamicTechnologies.length === 0 ? 'All Technologies (Upload resume to customize)' : 'All Technologies'}
+              </option>
+              {dynamicTechnologies.map((tech) => (
+                <option key={tech} value={tech}>{tech}</option>
+              ))}
             </select>
           </div>
 
@@ -289,14 +370,12 @@ export default function SmartFeedView({
             <select
               value={selectedLocation}
               onChange={(e) => setSelectedLocation(e.target.value)}
-              className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2"
+              className="w-full text-xs font-medium bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-zinc-100"
             >
-              <option value="all">All Locations (Pune, Mumbai, Hyderabad...)</option>
-              <option value="Pune">Pune</option>
-              <option value="Mumbai">Mumbai</option>
-              <option value="Hyderabad">Hyderabad</option>
-              <option value="Bengaluru">Bengaluru</option>
-              <option value="Remote">Remote</option>
+              <option value="all">All Locations</option>
+              {dynamicLocations.map((loc) => (
+                <option key={loc} value={loc}>{loc}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -306,19 +385,65 @@ export default function SmartFeedView({
       <div className="space-y-4">
         {filteredJobs.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-12 text-center">
-            <Clock className="w-10 h-10 mx-auto text-zinc-400 mb-3" />
-            <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
-              No vacancies found in this time window
-            </h3>
-            <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
-              You are currently filtering for <strong>{freshness === '48h' ? 'Last 48 Hours' : freshness}</strong>. Click &quot;Last 7 Days&quot; or &quot;All Openings&quot; above to see more active openings.
-            </p>
-            <button
-              onClick={() => setFreshness('all')}
-              className="mt-4 text-xs font-semibold px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
-            >
-              View All Openings
-            </button>
+            {!hasResume ? (
+              <div className="max-w-md mx-auto space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Upload Your Resume to Get Started
+                </h3>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  No pre-approved or dummy data is used. Upload your resume (PDF/DOCX) to let the AI discover your exact specialization (DevOps, SAP, Fullstack, Cloud, QA, Mobile, etc.) and generate relevant job roles & tech criteria.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={onOpenQuickSetup}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Upload Resume & Set Preferences</span>
+                  </button>
+                </div>
+              </div>
+            ) : jobs.length === 0 ? (
+              <div className="max-w-md mx-auto space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Profile Configured: {profile?.domainCategory || profile?.targetTitles?.[0] || 'Active Candidate'}
+                </h3>
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Your search preferences are configured from your resume. Head to the Harvester tab or click Add Job to harvest live vacancies matching your profile from ATS boards, Google Jobs, or LinkedIn.
+                </p>
+                <div className="pt-2 flex items-center justify-center gap-3">
+                  <button
+                    onClick={onOpenQuickSetup}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Adjust Preferences</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-md mx-auto space-y-3">
+                <Clock className="w-10 h-10 mx-auto text-zinc-400" />
+                <h3 className="text-base font-semibold text-zinc-800 dark:text-zinc-200">
+                  No vacancies found in this time window
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  You are currently filtering for <strong>{freshness === '48h' ? 'Last 48 Hours' : freshness}</strong>. Click &quot;All Openings&quot; above to see all {jobs.length} active openings.
+                </p>
+                <button
+                  onClick={() => setFreshness('all')}
+                  className="mt-2 text-xs font-semibold px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+                >
+                  View All Openings ({jobs.length})
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           filteredJobs.map((job) => {

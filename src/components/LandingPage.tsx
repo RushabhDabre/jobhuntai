@@ -46,8 +46,6 @@ export default function LandingPage({ onEnterApp, onOpenSignIn, onOpenSignUp }: 
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState('');
-  const [targetTitle, setTargetTitle] = useState('Software Developer');
-  const [targetLocation, setTargetLocation] = useState('Pune');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [activeRoadmapStep, setActiveRoadmapStep] = useState(0);
@@ -164,7 +162,7 @@ export default function LandingPage({ onEnterApp, onOpenSignIn, onOpenSignUp }: 
         throw new Error(data.error || 'Failed to create account.');
       }
 
-      // Also save preferred title and location
+      // Initialize empty, fresh profile for the user
       await fetch('/api/profile', {
         method: 'POST',
         headers: {
@@ -174,8 +172,10 @@ export default function LandingPage({ onEnterApp, onOpenSignIn, onOpenSignUp }: 
         body: JSON.stringify({
           name: name.trim(),
           email: data.user.email,
-          targetTitles: [targetTitle],
-          preferredLocations: [targetLocation],
+          targetTitles: [],
+          preferredLocations: [],
+          preferredTechnologies: [],
+          skills: [],
           geminiApiKey: geminiApiKey.trim() || undefined,
         }),
       });
@@ -523,43 +523,6 @@ export default function LandingPage({ onEnterApp, onOpenSignIn, onOpenSignUp }: 
               <p className="text-[11px] text-zinc-500 mt-1">
                 Zero billing needed. Google AI Studio provides a free tier for Gemini models.
               </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Primary Role Preference
-                </label>
-                <select
-                  value={targetTitle}
-                  onChange={(e) => setTargetTitle(e.target.value)}
-                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
-                >
-                  <option value="Software Developer">Software Developer</option>
-                  <option value="React Developer">React Developer</option>
-                  <option value="Fullstack Developer">Fullstack Developer</option>
-                  <option value="Frontend Developer">Frontend Developer</option>
-                  <option value="Backend Developer (Java / C#)">Backend Developer (Java / C#)</option>
-                  <option value="Python Developer">Python Developer</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Preferred Location
-                </label>
-                <select
-                  value={targetLocation}
-                  onChange={(e) => setTargetLocation(e.target.value)}
-                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
-                >
-                  <option value="Pune">Pune</option>
-                  <option value="Mumbai">Mumbai</option>
-                  <option value="Hyderabad">Hyderabad</option>
-                  <option value="Bengaluru">Bengaluru</option>
-                  <option value="Remote (India)">Remote (India)</option>
-                </select>
-              </div>
             </div>
 
             <div className="pt-3">

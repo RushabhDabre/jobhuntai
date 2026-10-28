@@ -101,7 +101,7 @@ export default function QuickStartModal({
     if (profile) {
       setSelectedRoles(profile.targetTitles || []);
       setSelectedTechs(profile.preferredTechnologies || []);
-      setSelectedLocations(profile.preferredLocations || ['Pune', 'Mumbai', 'Hyderabad']);
+      setSelectedLocations(profile.preferredLocations || []);
       if (profile.resumeFileName) {
         setResumeUploadedName(profile.resumeFileName);
       }
@@ -202,7 +202,7 @@ export default function QuickStartModal({
     onSaveProfile({
       targetTitles: selectedRoles,
       preferredTechnologies: selectedTechs,
-      preferredLocations: selectedLocations.length > 0 ? selectedLocations : ['Pune'],
+      preferredLocations: selectedLocations,
       hasCompletedQuickSetup: true,
     });
     onTriggerSearch();

@@ -54,6 +54,9 @@ export default function Home() {
       const profileData = await profileRes.json();
       if (profileData.success && profileData.profile) {
         setProfile(profileData.profile);
+        if (!profileData.profile.resumeText && !profileData.profile.hasCompletedQuickSetup) {
+          setIsQuickSetupOpen(true);
+        }
       } else {
         setProfile(null);
       }
