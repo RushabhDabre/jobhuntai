@@ -215,6 +215,43 @@ export default function Home() {
     }
   };
 
+  // Harvest live openings matching candidate's chosen profile keywords
+  const handleHarvestForProfile = async (targetRoles?: string[], preferredLocations?: string[]) => {
+    setActiveTab('feed');
+    const roles = targetRoles && targetRoles.length > 0 ? targetRoles : profile?.targetTitles || [];
+    if (roles.length === 0) return;
+
+    const primaryRole = roles[0];
+    const presets = [
+      { slug: 'razorpay', platform: 'greenhouse' as const },
+      { slug: 'browserstack', platform: 'ashby' as const },
+      { slug: 'swiggy', platform: 'lever' as const },
+      { slug: 'cred', platform: 'greenhouse' as const },
+    ];
+
+    for (const preset of presets) {
+      try {
+        const res = await fetch('/api/harvest/ats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({
+            platform: preset.platform,
+            companySlug: preset.slug,
+            keywordFilter: primaryRole,
+            limit: 6,
+            autoScore: true,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
+          handleJobsImported(data.jobs);
+        }
+      } catch (e) {
+        console.warn(`Initial harvest error for ${preset.slug}:`, e);
+      }
+    }
+  };
+
   // If user is not logged in or chose to view landing page, render LandingPage
   if (isLandingPage) {
     return (
@@ -276,6 +313,7 @@ export default function Home() {
                 onUpdateStatus={handleUpdateStatus}
                 onDeleteJob={handleDeleteJob}
                 onOpenQuickSetup={() => setIsQuickSetupOpen(true)}
+                onHarvestMatching={() => handleHarvestForProfile()}
               />
             )}
 
@@ -307,7 +345,7 @@ export default function Home() {
         onClose={() => setIsQuickSetupOpen(false)}
         profile={profile}
         onSaveProfile={handleSaveProfile}
-        onTriggerSearch={() => setActiveTab('feed')}
+        onTriggerSearch={handleHarvestForProfile}
       />
 
       <JobDetailModal

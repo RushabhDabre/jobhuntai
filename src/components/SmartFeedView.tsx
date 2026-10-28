@@ -27,6 +27,7 @@ interface SmartFeedViewProps {
   onUpdateStatus: (jobId: string, newStatus: JobStatus) => void;
   onDeleteJob: (jobId: string) => void;
   onOpenQuickSetup: () => void;
+  onHarvestMatching?: () => void;
 }
 
 type FreshnessOption = '48h' | '7d' | '10d' | '30d' | 'all';
@@ -47,6 +48,7 @@ export default function SmartFeedView({
   onUpdateStatus,
   onDeleteJob,
   onOpenQuickSetup,
+  onHarvestMatching,
 }: SmartFeedViewProps) {
   // Freshness filter: DEFAULT IS 48 HOURS!
   const [freshness, setFreshness] = useState<FreshnessOption>('48h');
@@ -415,9 +417,18 @@ export default function SmartFeedView({
                   Profile Configured: {profile?.domainCategory || profile?.targetTitles?.[0] || 'Active Candidate'}
                 </h3>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  Your search preferences are configured from your resume. Head to the Harvester tab or click Add Job to harvest live vacancies matching your profile from ATS boards, Google Jobs, or LinkedIn.
+                  Your search preferences are customized from your resume ({profile?.targetTitles?.join(', ') || 'No titles selected'}). Click below to harvest live openings directly matching your background.
                 </p>
-                <div className="pt-2 flex items-center justify-center gap-3">
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  {onHarvestMatching && (
+                    <button
+                      onClick={onHarvestMatching}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Fetch Live Vacancies Now</span>
+                    </button>
+                  )}
                   <button
                     onClick={onOpenQuickSetup}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"

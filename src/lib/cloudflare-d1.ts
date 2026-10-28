@@ -205,6 +205,15 @@ export async function d1DeleteJob(id: string): Promise<boolean> {
 // ----------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function d1RowToProfile(row: any): UserProfile {
+  let meta: Record<string, any> = {};
+  if (row.bio_notes) {
+    try {
+      meta = JSON.parse(row.bio_notes);
+    } catch {
+      // not JSON
+    }
+  }
+
   return {
     id: row.id,
     userId: row.id,
@@ -221,11 +230,20 @@ export function d1RowToProfile(row: any): UserProfile {
     noticePeriod: row.notice_period || 'Immediate Joiner',
     preferredWorkMode: row.preferred_work_mode || 'any',
     skills: safeParseArray<string>(row.skills, []),
+    suggestedRoles: safeParseArray<string>(
+      row.suggested_roles,
+      Array.isArray(meta.suggestedRoles) ? meta.suggestedRoles : []
+    ),
+    suggestedTechnologies: safeParseArray<string>(
+      row.suggested_technologies,
+      Array.isArray(meta.suggestedTechnologies) ? meta.suggestedTechnologies : []
+    ),
+    domainCategory: row.domain_category || meta.domainCategory || undefined,
     resumeText: row.resume_text || '',
     resumeFileName: row.resume_file_name || undefined,
     geminiApiKey: row.gemini_api_key || undefined,
     hasCompletedQuickSetup: Boolean(row.has_completed_quick_setup),
-    bioNotes: row.bio_notes || undefined,
+    bioNotes: typeof meta.bio === 'string' ? meta.bio : (row.bio_notes || undefined),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
@@ -241,6 +259,13 @@ export async function d1GetUserProfile(userId?: string): Promise<UserProfile | n
 
 export async function d1SaveUserProfile(p: UserProfile, userId?: string): Promise<UserProfile> {
   const targetId = userId || p.email || p.id || 'default_user';
+  const bioNotesPayload = JSON.stringify({
+    bio: p.bioNotes || '',
+    suggestedRoles: p.suggestedRoles || [],
+    suggestedTechnologies: p.suggestedTechnologies || [],
+    domainCategory: p.domainCategory || '',
+  });
+
   const sql = `
     INSERT OR REPLACE INTO user_profile (
       id, name, email, phone, current_location, preferred_locations,
@@ -276,7 +301,7 @@ export async function d1SaveUserProfile(p: UserProfile, userId?: string): Promis
     p.resumeFileName || null,
     p.geminiApiKey || null,
     p.hasCompletedQuickSetup ? 1 : 0,
-    p.bioNotes || null,
+    bioNotesPayload,
     p.updatedAt || new Date().toISOString(),
   ];
 

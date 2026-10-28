@@ -11,11 +11,15 @@ import {
   MapPin,
   Briefcase,
   Code2,
-  Clock,
   ArrowRight,
   Plus,
   Compass,
   FileText,
+  Key,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  ShieldCheck,
 } from 'lucide-react';
 import { UserProfile } from '@/types/job';
 import { getAuthHeaders, getStoredSession } from '@/lib/auth';
@@ -24,8 +28,8 @@ interface QuickStartModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: UserProfile | null;
-  onSaveProfile: (updated: Partial<UserProfile>) => void;
-  onTriggerSearch: () => void;
+  onSaveProfile: (updated: Partial<UserProfile>) => Promise<void> | void;
+  onTriggerSearch: (roles?: string[], locations?: string[]) => Promise<void> | void;
 }
 
 const POPULAR_LOCATIONS = [
@@ -48,38 +52,103 @@ export default function QuickStartModal({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // API Key State
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isEditingKey, setIsEditingKey] = useState(false);
+
+  // Resume & Preferences State
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(['Pune', 'Mumbai', 'Hyderabad', 'Bengaluru', 'Delhi NCR', 'Remote (India)']);
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [customTechInput, setCustomTechInput] = useState('');
   const [uploadingResume, setUploadingResume] = useState(false);
   const [resumeUploadedName, setResumeUploadedName] = useState('');
   const [detectedDomain, setDetectedDomain] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [parsedSuggestions, setParsedSuggestions] = useState<{ roles: string[]; techs: string[] }>({
+    roles: [],
+    techs: [],
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Derive dynamic suggestions from the resume
+  // Sync state when profile opens or changes
+  useEffect(() => {
+    if (profile) {
+      if (profile.geminiApiKey) {
+        setApiKeyInput(profile.geminiApiKey);
+        setIsEditingKey(false);
+      } else {
+        setIsEditingKey(true);
+      }
+
+      if (profile.targetTitles && profile.targetTitles.length > 0) {
+        setSelectedRoles(profile.targetTitles);
+      }
+      if (profile.preferredTechnologies && profile.preferredTechnologies.length > 0) {
+        setSelectedTechs(profile.preferredTechnologies);
+      }
+      if (profile.preferredLocations && profile.preferredLocations.length > 0) {
+        setSelectedLocations(profile.preferredLocations);
+      }
+      if (profile.resumeFileName) {
+        setResumeUploadedName(profile.resumeFileName);
+      }
+      if (profile.domainCategory) {
+        setDetectedDomain(profile.domainCategory);
+      }
+      if (profile.suggestedRoles || profile.suggestedTechnologies) {
+        setParsedSuggestions({
+          roles: profile.suggestedRoles || [],
+          techs: profile.suggestedTechnologies || [],
+        });
+      }
+    }
+  }, [profile]);
+
+  // Manage modal open/close via native HTML5 dialog
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (isOpen && dialog && !dialog.open) {
+      dialog.showModal();
+    } else if (!isOpen && dialog && dialog.open) {
+      dialog.close();
+    }
+  }, [isOpen]);
+
+  // Derive dynamic list of role suggestions from resume parsing + profile
   const availableRoles = useMemo(() => {
     const list: string[] = [];
-    if (profile?.suggestedRoles && profile.suggestedRoles.length > 0) {
-      list.push(...profile.suggestedRoles);
+    if (parsedSuggestions.roles.length > 0) {
+      list.push(...parsedSuggestions.roles);
+    }
+    if (profile?.suggestedRoles) {
+      for (const r of profile.suggestedRoles) {
+        if (!list.includes(r)) list.push(r);
+      }
     }
     if (profile?.targetTitles) {
       for (const t of profile.targetTitles) {
         if (!list.includes(t)) list.push(t);
       }
     }
-    // Add any currently selected roles
     for (const r of selectedRoles) {
       if (!list.includes(r)) list.push(r);
     }
     return list;
-  }, [profile, selectedRoles]);
+  }, [parsedSuggestions.roles, profile, selectedRoles]);
 
+  // Derive dynamic list of tech suggestions from resume parsing + profile
   const availableTechs = useMemo(() => {
     const list: string[] = [];
-    if (profile?.suggestedTechnologies && profile.suggestedTechnologies.length > 0) {
-      list.push(...profile.suggestedTechnologies);
+    if (parsedSuggestions.techs.length > 0) {
+      list.push(...parsedSuggestions.techs);
+    }
+    if (profile?.suggestedTechnologies) {
+      for (const t of profile.suggestedTechnologies) {
+        if (!list.includes(t)) list.push(t);
+      }
     }
     if (profile?.skills) {
       for (const s of profile.skills.slice(0, 15)) {
@@ -95,30 +164,7 @@ export default function QuickStartModal({
       if (!list.includes(t)) list.push(t);
     }
     return list;
-  }, [profile, selectedTechs]);
-
-  useEffect(() => {
-    if (profile) {
-      setSelectedRoles(profile.targetTitles || []);
-      setSelectedTechs(profile.preferredTechnologies || []);
-      setSelectedLocations(profile.preferredLocations || []);
-      if (profile.resumeFileName) {
-        setResumeUploadedName(profile.resumeFileName);
-      }
-      if (profile.domainCategory) {
-        setDetectedDomain(profile.domainCategory);
-      }
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (isOpen && dialog && !dialog.open) {
-      dialog.showModal();
-    } else if (!isOpen && dialog && dialog.open) {
-      dialog.close();
-    }
-  }, [isOpen]);
+  }, [parsedSuggestions.techs, profile, selectedTechs]);
 
   if (!isOpen) return null;
 
@@ -146,8 +192,16 @@ export default function QuickStartModal({
     }
   };
 
+  // Upload resume with isolated Gemini API key
   const handleFileUpload = async (file: File) => {
     if (!file) return;
+
+    const activeKey = apiKeyInput.trim() || profile?.geminiApiKey;
+    if (!activeKey) {
+      setUploadError('Please enter your Google Gemini API key in Step 1 first so AI can parse your resume.');
+      return;
+    }
+
     setUploadingResume(true);
     setUploadError(null);
 
@@ -156,6 +210,7 @@ export default function QuickStartModal({
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('apiKey', activeKey);
     if (userId) {
       formData.append('userId', userId);
     }
@@ -176,61 +231,106 @@ export default function QuickStartModal({
       }
 
       setResumeUploadedName(file.name);
-      if (data.profile?.domainCategory) {
-        setDetectedDomain(data.profile.domainCategory);
+      setIsEditingKey(false);
+
+      if (data.domainCategory) {
+        setDetectedDomain(data.domainCategory);
       }
 
-      // Automatically select the AI extracted titles and technologies
+      // Collect returned suggestion arrays
+      const returnedRoles: string[] = Array.isArray(data.suggestedRoles) && data.suggestedRoles.length > 0
+        ? data.suggestedRoles
+        : Array.isArray(data.profile?.suggestedRoles)
+        ? data.profile.suggestedRoles
+        : [];
+
+      const returnedTechs: string[] = Array.isArray(data.suggestedTechnologies) && data.suggestedTechnologies.length > 0
+        ? data.suggestedTechnologies
+        : Array.isArray(data.profile?.suggestedTechnologies)
+        ? data.profile.suggestedTechnologies
+        : [];
+
+      setParsedSuggestions({
+        roles: returnedRoles,
+        techs: returnedTechs,
+      });
+
+      // Automatically select extracted titles and technologies
       if (Array.isArray(data.profile?.targetTitles) && data.profile.targetTitles.length > 0) {
         setSelectedRoles(data.profile.targetTitles);
-      }
-      if (Array.isArray(data.profile?.preferredTechnologies) && data.profile.preferredTechnologies.length > 0) {
-        setSelectedTechs(data.profile.preferredTechnologies);
+      } else if (returnedRoles.length > 0) {
+        setSelectedRoles(returnedRoles.slice(0, 3));
       }
 
-      onSaveProfile(data.profile);
+      if (Array.isArray(data.profile?.preferredTechnologies) && data.profile.preferredTechnologies.length > 0) {
+        setSelectedTechs(data.profile.preferredTechnologies);
+      } else if (returnedTechs.length > 0) {
+        setSelectedTechs(returnedTechs.slice(0, 6));
+      }
+
+      if (data.profile) {
+        await onSaveProfile(data.profile);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
       setUploadError(msg);
     } finally {
       setUploadingResume(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Submit preferences and launch job matching
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveProfile({
-      targetTitles: selectedRoles,
-      preferredTechnologies: selectedTechs,
-      preferredLocations: selectedLocations,
-      hasCompletedQuickSetup: true,
-    });
-    onTriggerSearch();
-    onClose();
+    const activeKey = apiKeyInput.trim() || profile?.geminiApiKey;
+    if (!activeKey) {
+      setUploadError('Please provide your Google Gemini API key in Step 1 to power your job matches.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSaveProfile({
+        geminiApiKey: activeKey,
+        targetTitles: selectedRoles,
+        preferredTechnologies: selectedTechs,
+        preferredLocations: selectedLocations,
+        hasCompletedQuickSetup: true,
+      });
+
+      await onTriggerSearch(selectedRoles, selectedLocations);
+      onClose();
+    } catch (err) {
+      console.error('Failed to finalize preferences:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const hasResume = Boolean(resumeUploadedName || profile?.resumeText);
+  const hasKey = Boolean(apiKeyInput.trim() || profile?.geminiApiKey);
 
   return (
     <dialog
       ref={dialogRef}
       onCancel={onClose}
-      className="m-auto backdrop:bg-black/60 backdrop:backdrop-blur-xs p-0 bg-transparent border-0 max-w-2xl w-full text-zinc-900 dark:text-zinc-100 open:animate-in open:fade-in open:zoom-in-95 duration-150"
+      className="m-auto backdrop:bg-black/70 backdrop:backdrop-blur-xs p-0 bg-transparent border-0 max-w-2xl w-full text-zinc-900 dark:text-zinc-100 open:animate-in open:fade-in open:zoom-in-95 duration-150"
       style={{ overscrollBehavior: 'contain' }}
     >
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-start justify-between">
+        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-800/40 flex items-start justify-between">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
               <Compass className="w-3.5 h-3.5" />
-              <span>Resume & Search Preferences</span>
+              <span>Step-by-Step Onboarding Wizard</span>
             </div>
             <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 tracking-tight">
-              Customize Your Job Match Profile
+              Setup Your AI Job Matching Engine
             </h2>
             <p className="text-xs text-zinc-500">
-              Upload your resume first. The AI will extract your exact profession (SAP, DevOps, Fullstack, QA, Mobile, etc.) and generate relevant vacancy criteria.
+              Connect your free Gemini key, upload your resume, verify extracted keywords, and start discovering live 48-hour vacancies.
             </p>
           </div>
 
@@ -244,12 +344,86 @@ export default function QuickStartModal({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto">
-          {/* STEP 1: Upload Resume (Always First!) */}
+          {/* STEP 1: Connect Gemini API Key */}
+          <div className="space-y-2.5 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-800/20">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <Key className="w-4 h-4 text-amber-500" />
+                <span>1. Connect Your Google Gemini API Key</span>
+              </label>
+
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                <span>Get Free Key at Google AI Studio</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <p className="text-[11px] text-zinc-500">
+              Powers AI resume parsing, match scoring, and customized pitch generation. Free keys require <strong>zero billing</strong> and take 30 seconds to generate.
+            </p>
+
+            {hasKey && !isEditingKey ? (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-emerald-800 dark:text-emerald-200">
+                      ✓ Gemini API Key Connected
+                    </p>
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      Isolated exclusively to your private account.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingKey(true)}
+                  className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
+                >
+                  Change Key
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    placeholder="AIzaSy... (Paste your free Gemini key here)"
+                    value={apiKeyInput}
+                    onChange={(e) => {
+                      setApiKeyInput(e.target.value);
+                      setUploadError(null);
+                    }}
+                    className="w-full text-xs pl-9 pr-20 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-zinc-900 dark:text-zinc-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer flex items-center gap-1"
+                  >
+                    {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    <span>{showApiKey ? 'Hide' : 'Show'}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-zinc-400">
+                  🔒 <strong>Privacy Guarantee:</strong> Your key is stored in your private user profile only and never shared with other users.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* STEP 2: Upload Resume */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-indigo-500" />
-                <span>1. Upload Resume (Generates Relevant Job Roles & Skills)</span>
+                <span>2. Upload Resume (Generates Relevant Job Roles & Skills)</span>
               </label>
               {detectedDomain && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
@@ -297,7 +471,7 @@ export default function QuickStartModal({
                       ? 'Analyzing resume with Gemini AI...'
                       : resumeUploadedName
                       ? `Active Resume: ${resumeUploadedName}`
-                      : 'Upload Your Resume PDF (DevOps, SAP, Fullstack, QA, etc.)'}
+                      : 'Upload Your Resume PDF (DevOps, SAP, Fullstack, QA, Cloud, etc.)'}
                   </p>
                   <p className="text-[11px] text-zinc-500">
                     {hasResume
@@ -316,18 +490,22 @@ export default function QuickStartModal({
               </span>
             </div>
 
-            {uploadError && <p className="text-xs text-rose-500">{uploadError}</p>}
+            {uploadError && (
+              <p className="text-xs text-rose-500 bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900">
+                {uploadError}
+              </p>
+            )}
           </div>
 
-          {/* STEP 2: Job Role Preferences (Populated dynamically from resume!) */}
+          {/* STEP 3: Job Role Preferences (Populated dynamically from resume!) */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
                 <Briefcase className="w-4 h-4 text-indigo-500" />
-                <span>2. Target Job Roles {availableRoles.length > 0 ? '(Relevant to Your Resume)' : ''}</span>
+                <span>3. Target Job Roles {availableRoles.length > 0 ? `(${availableRoles.length} Relevant Suggestions)` : ''}</span>
               </div>
               {hasResume && (
-                <span className="text-[10px] text-zinc-400">Click to select/deselect</span>
+                <span className="text-[10px] text-zinc-400">Click pills to select / deselect</span>
               )}
             </div>
 
@@ -354,7 +532,7 @@ export default function QuickStartModal({
               </div>
             ) : (
               <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-500 text-center">
-                <span>Upload your resume above to get automated job role suggestions tailored to your background.</span>
+                <span>Upload your resume above to get automated job role suggestions tailored specifically to your profession.</span>
               </div>
             )}
 
@@ -384,15 +562,15 @@ export default function QuickStartModal({
             </div>
           </div>
 
-          {/* STEP 3: Technologies & Skills (Populated dynamically from resume!) */}
+          {/* STEP 4: Technologies & Skills (Populated dynamically from resume!) */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
                 <Code2 className="w-4 h-4 text-emerald-500" />
-                <span>3. Primary Technologies & Tools {availableTechs.length > 0 ? '(Extracted from Resume)' : ''}</span>
+                <span>4. Primary Technologies & Tools {availableTechs.length > 0 ? `(${availableTechs.length} Extracted from Resume)` : ''}</span>
               </div>
               {hasResume && (
-                <span className="text-[10px] text-zinc-400">Click to select/deselect</span>
+                <span className="text-[10px] text-zinc-400">Click pills to select / deselect</span>
               )}
             </div>
 
@@ -419,7 +597,7 @@ export default function QuickStartModal({
               </div>
             ) : (
               <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-500 text-center">
-                <span>Upload your resume above to extract your exact tech stack and tools.</span>
+                <span>Upload your resume above to extract your exact tech stack, tools, and platforms.</span>
               </div>
             )}
 
@@ -427,7 +605,7 @@ export default function QuickStartModal({
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="text"
-                placeholder="Or type a custom technology/skill (e.g. Kubernetes, SAP S/4HANA) and press Add"
+                placeholder="Or type a custom technology/skill (e.g. Kubernetes, SAP S/4HANA, Terraform) and press Add"
                 value={customTechInput}
                 onChange={(e) => setCustomTechInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -449,11 +627,11 @@ export default function QuickStartModal({
             </div>
           </div>
 
-          {/* STEP 4: Preferred Locations in India */}
+          {/* STEP 5: Preferred Locations in India */}
           <div className="space-y-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-200">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
               <MapPin className="w-4 h-4 text-purple-500" />
-              <span>4. Preferred Locations (India Market)</span>
+              <span>5. Preferred Locations (India Market)</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {POPULAR_LOCATIONS.map((loc) => {
@@ -481,13 +659,23 @@ export default function QuickStartModal({
           <div className="pt-2">
             <button
               type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-md shadow-indigo-600/20 transition-all cursor-pointer text-sm"
+              disabled={isSubmitting || uploadingResume}
+              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md shadow-indigo-600/20 transition-all cursor-pointer text-sm"
             >
-              <span>Apply Filters & Discover 48h Vacancies</span>
-              <ArrowRight className="w-4 h-4" />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Harvesting & Matching 48h Vacancies...</span>
+                </>
+              ) : (
+                <>
+                  <span>Save Preferences & Fetch Matching Jobs 🚀</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
             <p className="text-center text-[11px] text-zinc-400 mt-2">
-              ⚡ Vacancies are refreshed and filtered according to your selected roles and technologies.
+              ⚡ Openings are fetched and matched strictly using your isolated profile criteria.
             </p>
           </div>
         </form>

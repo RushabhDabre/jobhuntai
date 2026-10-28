@@ -37,7 +37,6 @@ export default function AuthModal({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [geminiApiKey, setGeminiApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,7 +80,6 @@ export default function AuthModal({
               name: name.trim(),
               email: trimmedEmail,
               password: trimmedPassword,
-              geminiApiKey: geminiApiKey.trim() || undefined,
             }
           : {
               email: trimmedEmail,
@@ -104,7 +102,7 @@ export default function AuthModal({
         email: data.user.email,
         name: data.user.name,
         token: data.token,
-        geminiApiKey: geminiApiKey.trim() || data.profile?.geminiApiKey || undefined,
+        geminiApiKey: data.profile?.geminiApiKey || undefined,
         createdAt: new Date().toISOString(),
       };
 
@@ -256,36 +254,6 @@ export default function AuthModal({
               </button>
             </div>
           </div>
-
-          {/* Optional Gemini API Key (Sign Up only) */}
-          {mode === 'signup' && (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                  Google Gemini API Key (Optional)
-                </label>
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5"
-                >
-                  <span>Get Free Key</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-              <div className="relative">
-                <Key className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  placeholder="AIzaSy... (Can be added later in settings)"
-                  value={geminiApiKey}
-                  onChange={(e) => setGeminiApiKey(e.target.value)}
-                  className="w-full text-xs sm:text-sm pl-10 pr-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-zinc-900 dark:text-zinc-100"
-                />
-              </div>
-            </div>
-          )}
 
           {/* Submit Button */}
           <div className="pt-2">

@@ -21,31 +21,28 @@ export async function POST(req: Request) {
 
     const settings = await getAppSettings();
     const userProfile = userId ? await getUserProfile(userId) : null;
-    const apiKey = userProfile?.geminiApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    const bodyApiKey = (formData.get('apiKey') as string) || undefined;
+    const apiKey = bodyApiKey?.trim() || userProfile?.geminiApiKey?.trim();
 
     if (!apiKey) {
-      const now = new Date();
-      const resetTimeStr = new Date(now.getTime() + 15 * 60 * 1000).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
       return NextResponse.json(
         {
           success: false,
-          error: 'Gemini API key is missing. Please configure it in Settings (Gear Icon).',
+          error: 'Please connect your personal Google Gemini API key first. Free keys are available at Google AI Studio with zero billing required.',
+          isApiKeyMissing: true,
           formattedError: {
             isRateLimited: false,
-            isExpired: true,
+            isExpired: false,
             service: 'Gemini',
-            title: 'API Key Missing',
-            message: 'A Gemini API key is needed to parse resumes. Free keys are available from Google AI Studio.',
-            resetTime: resetTimeStr,
+            title: 'Gemini API Key Required',
+            message: 'Each user connects their own free Google Gemini API key to ensure private, isolated AI usage without sharing quotas.',
+            resetTime: '',
             resetInMinutes: 0,
-            suggestion: 'Click Settings in the top-right to add your key.',
-            rawMessage: 'Missing API key',
+            suggestion: 'Enter your API key in Step 1 of the setup wizard or Settings.',
+            rawMessage: 'API Key missing',
           },
         },
-        { status: 200 }
+        { status: 400 }
       );
     }
 
@@ -122,6 +119,7 @@ Be precise. Calculate yearsOfExperience from first professional role to present.
         currentLocation: parsed.currentLocation || userProfile?.currentLocation || '',
         yearsOfExperience: Number(parsed.yearsOfExperience) || userProfile?.yearsOfExperience || 0,
         domainCategory: parsed.domainCategory || undefined,
+        geminiApiKey: apiKey,
         targetTitles: Array.isArray(parsed.targetTitles) && parsed.targetTitles.length > 0
           ? parsed.targetTitles
           : Array.isArray(parsed.suggestedRoles) && parsed.suggestedRoles.length > 0
@@ -145,6 +143,12 @@ Be precise. Calculate yearsOfExperience from first professional role to present.
     return NextResponse.json({
       success: true,
       profile: updatedProfile,
+      domainCategory: parsed.domainCategory,
+      targetTitles: updatedProfile.targetTitles,
+      suggestedRoles: updatedProfile.suggestedRoles,
+      preferredTechnologies: updatedProfile.preferredTechnologies,
+      suggestedTechnologies: updatedProfile.suggestedTechnologies,
+      skills: updatedProfile.skills,
       message: `Successfully parsed and synced resume from ${file.name}`,
     });
   } catch (error: unknown) {

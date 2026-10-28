@@ -3,11 +3,11 @@ import { Job, UserProfile, MatchAnalysis } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
 
 async function getGenAIClient(customApiKey?: string) {
-  const settings = await getAppSettings();
-  const apiKey = customApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
+  const apiKey = customApiKey?.trim();
   if (!apiKey) {
-    throw new Error('Gemini API key is missing. Please configure it in Settings or set GEMINI_API_KEY.');
+    throw new Error('Please connect your Google Gemini API key. Each candidate uses their own free key to keep usage isolated and private.');
   }
+  const settings = await getAppSettings();
   return {
     client: new GoogleGenAI({ apiKey }),
     model: settings.defaultGeminiModel || 'gemini-2.5-flash',

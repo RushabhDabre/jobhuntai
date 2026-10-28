@@ -150,6 +150,15 @@ function jobToDb(job: Job, userId?: string) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function profileFromDb(row: any): UserProfile {
+  let meta: Record<string, any> = {};
+  if (row.bio_notes) {
+    try {
+      meta = JSON.parse(row.bio_notes);
+    } catch {
+      // not JSON string
+    }
+  }
+
   return {
     id: row.id || 'default_user',
     userId: row.id || 'default_user',
@@ -166,17 +175,35 @@ function profileFromDb(row: any): UserProfile {
     noticePeriod: row.notice_period || 'Immediate Joiner',
     preferredWorkMode: row.preferred_work_mode || 'any',
     skills: Array.isArray(row.skills) ? row.skills : [],
+    suggestedRoles: Array.isArray(row.suggested_roles)
+      ? row.suggested_roles
+      : Array.isArray(meta.suggestedRoles)
+      ? meta.suggestedRoles
+      : [],
+    suggestedTechnologies: Array.isArray(row.suggested_technologies)
+      ? row.suggested_technologies
+      : Array.isArray(meta.suggestedTechnologies)
+      ? meta.suggestedTechnologies
+      : [],
+    domainCategory: row.domain_category || meta.domainCategory || undefined,
     resumeText: row.resume_text || '',
     resumeFileName: row.resume_file_name || undefined,
     geminiApiKey: row.gemini_api_key || undefined,
     hasCompletedQuickSetup: Boolean(row.has_completed_quick_setup),
-    bioNotes: row.bio_notes || undefined,
+    bioNotes: typeof meta.bio === 'string' ? meta.bio : (row.bio_notes || undefined),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
 }
 
 function profileToDb(p: UserProfile, userId?: string) {
   const targetId = userId || p.email || p.id || 'default_user';
+  const bioNotesPayload = JSON.stringify({
+    bio: p.bioNotes || '',
+    suggestedRoles: p.suggestedRoles || [],
+    suggestedTechnologies: p.suggestedTechnologies || [],
+    domainCategory: p.domainCategory || '',
+  });
+
   return {
     id: targetId,
     name: p.name,
@@ -196,7 +223,7 @@ function profileToDb(p: UserProfile, userId?: string) {
     resume_file_name: p.resumeFileName,
     gemini_api_key: p.geminiApiKey || null,
     has_completed_quick_setup: p.hasCompletedQuickSetup,
-    bio_notes: p.bioNotes,
+    bio_notes: bioNotesPayload,
     updated_at: new Date().toISOString(),
   };
 }
