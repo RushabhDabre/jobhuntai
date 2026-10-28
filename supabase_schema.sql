@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_posted_at ON jobs(posted_at DESC);
 -- 2. Table for Candidate Profile & Resume
 CREATE TABLE IF NOT EXISTS user_profile (
   id TEXT PRIMARY KEY DEFAULT 'default_user',
-  name TEXT DEFAULT 'Rushabh Dabare',
+  name TEXT DEFAULT 'Candidate',
   email TEXT,
   phone TEXT,
   current_location TEXT DEFAULT 'Pune, India',

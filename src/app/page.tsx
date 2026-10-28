@@ -11,9 +11,9 @@ import SettingsModal from '@/components/SettingsModal';
 import AddJobModal from '@/components/AddJobModal';
 import QuickStartModal from '@/components/QuickStartModal';
 import LandingPage from '@/components/LandingPage';
-import LoginModal from '@/components/LoginModal';
+import AuthModal from '@/components/AuthModal';
 import { Job, JobStatus, UserProfile } from '@/types/job';
-import { UserSession, getStoredSession, clearSession, saveSession } from '@/lib/auth';
+import { UserSession, getStoredSession, logoutUser, saveSession, checkServerSession, getAuthHeaders } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
@@ -25,14 +25,15 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddJobOpen, setIsAddJobOpen] = useState(false);
   const [isQuickSetupOpen, setIsQuickSetupOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [isLandingPage, setIsLandingPage] = useState(false);
 
   // Fetch jobs and profile for a specific user
   const fetchData = useCallback(async (userId?: string) => {
     setLoading(true);
-    const headers: Record<string, string> = {};
+    const headers = getAuthHeaders();
     if (userId) {
       headers['x-user-id'] = userId;
     }
@@ -61,30 +62,53 @@ export default function Home() {
 
   // Initialize session on mount
   useEffect(() => {
-    const session = getStoredSession();
-    if (session) {
-      setUserSession(session);
-      setIsLandingPage(false);
-      fetchData(session.id);
-    } else {
-      // Show landing page for first-time visitors / unauthenticated users
+    let mounted = true;
+
+    async function initAuth() {
+      // 1. First check server cookie session
+      const serverSession = await checkServerSession();
+      if (!mounted) return;
+
+      if (serverSession) {
+        setUserSession(serverSession);
+        setIsLandingPage(false);
+        fetchData(serverSession.id);
+        return;
+      }
+
+      // 2. Check local storage session
+      const localSession = getStoredSession();
+      if (localSession) {
+        setUserSession(localSession);
+        setIsLandingPage(false);
+        fetchData(localSession.id);
+        return;
+      }
+
+      // 3. Unauthenticated -> show landing page
       setIsLandingPage(true);
       setLoading(false);
     }
+
+    initAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, [fetchData]);
 
-  // Handle Login or Quick Start from Landing Page
-  const handleLoginSuccess = (session: UserSession) => {
+  // Handle Login or Sign Up Success
+  const handleAuthSuccess = (session: UserSession) => {
     setUserSession(session);
     saveSession(session);
     setIsLandingPage(false);
-    setIsLoginOpen(false);
+    setIsAuthOpen(false);
     fetchData(session.id);
   };
 
   // Handle Log Out
-  const handleLogout = () => {
-    clearSession();
+  const handleLogout = async () => {
+    await logoutUser();
     setUserSession(null);
     setJobs([]);
     setProfile(null);
@@ -121,7 +145,7 @@ export default function Home() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...(userSession ? { 'x-user-id': userSession.id } : {}),
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -140,7 +164,7 @@ export default function Home() {
     try {
       await fetch(`/api/jobs/${jobId}`, {
         method: 'DELETE',
-        headers: userSession ? { 'x-user-id': userSession.id } : {},
+        headers: getAuthHeaders(),
       });
     } catch (err) {
       console.error('Failed to delete job:', err);
@@ -169,7 +193,7 @@ export default function Home() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(userSession ? { 'x-user-id': userSession.id } : {}),
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(partialProfile),
       });
@@ -187,13 +211,21 @@ export default function Home() {
     return (
       <>
         <LandingPage
-          onEnterApp={handleLoginSuccess}
-          onOpenLogin={() => setIsLoginOpen(true)}
+          onEnterApp={handleAuthSuccess}
+          onOpenSignIn={() => {
+            setAuthMode('signin');
+            setIsAuthOpen(true);
+          }}
+          onOpenSignUp={() => {
+            setAuthMode('signup');
+            setIsAuthOpen(true);
+          }}
         />
-        <LoginModal
-          isOpen={isLoginOpen}
-          onClose={() => setIsLoginOpen(false)}
-          onLoginSuccess={handleLoginSuccess}
+        <AuthModal
+          isOpen={isAuthOpen}
+          initialMode={authMode}
+          onClose={() => setIsAuthOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
         />
       </>
     );
@@ -210,7 +242,10 @@ export default function Home() {
         profile={profile}
         userSession={userSession}
         onLogout={handleLogout}
-        onOpenLogin={() => setIsLoginOpen(true)}
+        onOpenLogin={() => {
+          setAuthMode('signin');
+          setIsAuthOpen(true);
+        }}
         onOpenLanding={() => setIsLandingPage(true)}
         stats={stats}
       />
@@ -277,10 +312,11 @@ export default function Home() {
         onClose={() => setIsSettingsOpen(false)}
       />
 
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
+      <AuthModal
+        isOpen={isAuthOpen}
+        initialMode={authMode}
+        onClose={() => setIsAuthOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
       />
 
       <AddJobModal

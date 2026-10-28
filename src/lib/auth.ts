@@ -1,12 +1,13 @@
 export interface UserSession {
-  id: string;
+  id: string; // userId
   name: string;
   email: string;
+  token?: string;
   geminiApiKey?: string;
   createdAt: string;
 }
 
-const STORAGE_KEY = 'jobhunt_auth_session';
+const STORAGE_KEY = 'jh_user_session';
 
 export function getStoredSession(): UserSession | null {
   if (typeof window === 'undefined') return null;
@@ -39,10 +40,53 @@ export function clearSession(): void {
 
 export function getAuthHeaders(): Record<string, string> {
   const session = getStoredSession();
-  if (session && session.id) {
-    return {
-      'x-user-id': session.id,
-    };
+  const headers: Record<string, string> = {};
+
+  if (session) {
+    if (session.token) {
+      headers['Authorization'] = `Bearer ${session.token}`;
+      headers['x-session-token'] = session.token;
+    }
+    if (session.id) {
+      headers['x-user-id'] = session.id;
+    }
   }
-  return {};
+
+  return headers;
+}
+
+export async function checkServerSession(): Promise<UserSession | null> {
+  try {
+    const headers = getAuthHeaders();
+    const res = await fetch('/api/auth', { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.success && data.user) {
+      const stored = getStoredSession();
+      const updated: UserSession = {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        token: stored?.token,
+        geminiApiKey: data.profile?.geminiApiKey || stored?.geminiApiKey,
+        createdAt: stored?.createdAt || new Date().toISOString(),
+      };
+      saveSession(updated);
+      return updated;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function logoutUser(): Promise<void> {
+  try {
+    const headers = getAuthHeaders();
+    await fetch('/api/auth/logout', { method: 'POST', headers });
+  } catch {
+    // ignore
+  } finally {
+    clearSession();
+  }
 }

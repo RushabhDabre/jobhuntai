@@ -22,22 +22,34 @@ import {
   ChevronRight,
   Star,
   Zap,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  UserPlus,
+  LogIn,
+  User,
+  Mail,
 } from 'lucide-react';
 import { UserSession, saveSession } from '@/lib/auth';
 
 interface LandingPageProps {
   onEnterApp: (session: UserSession) => void;
-  onOpenLogin: () => void;
+  onOpenSignIn: () => void;
+  onOpenSignUp: () => void;
 }
 
-export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProps) {
+export default function LandingPage({ onEnterApp, onOpenSignIn, onOpenSignUp }: LandingPageProps) {
   // Quick onboarding form state
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [targetTitle, setTargetTitle] = useState('Software Developer');
   const [targetLocation, setTargetLocation] = useState('Pune');
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [activeRoadmapStep, setActiveRoadmapStep] = useState(0);
 
   const roadmapSteps = [
@@ -117,51 +129,71 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
 
   const handleQuickLaunch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    setFormError(null);
+
+    if (!name.trim()) {
+      setFormError('Please enter your full name.');
+      return;
+    }
+
+    if (!email.trim()) {
+      setFormError('Please enter your email address.');
+      return;
+    }
+
+    if (!password.trim() || password.trim().length < 6) {
+      setFormError('Password must be at least 6 characters long.');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth', {
+      const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
-          name: name.trim() || email.split('@')[0],
+          email: email.trim().toLowerCase(),
+          password: password.trim(),
+          name: name.trim(),
           geminiApiKey: geminiApiKey.trim() || undefined,
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
-        // Also save preferred title and location
-        await fetch('/api/profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': data.user.id,
-          },
-          body: JSON.stringify({
-            name: name.trim() || data.user.name,
-            email: data.user.email,
-            targetTitles: [targetTitle],
-            preferredLocations: [targetLocation],
-            geminiApiKey: geminiApiKey.trim() || undefined,
-          }),
-        });
-
-        const session: UserSession = {
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.name,
-          geminiApiKey: geminiApiKey.trim() || undefined,
-          createdAt: new Date().toISOString(),
-        };
-
-        saveSession(session);
-        onEnterApp(session);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create account.');
       }
-    } catch (err) {
-      console.error('Launch failed:', err);
+
+      // Also save preferred title and location
+      await fetch('/api/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': data.user.id,
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: data.user.email,
+          targetTitles: [targetTitle],
+          preferredLocations: [targetLocation],
+          geminiApiKey: geminiApiKey.trim() || undefined,
+        }),
+      });
+
+      const session: UserSession = {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        token: data.token,
+        geminiApiKey: geminiApiKey.trim() || undefined,
+        createdAt: new Date().toISOString(),
+      };
+
+      saveSession(session);
+      onEnterApp(session);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed. Please try again.';
+      setFormError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -186,7 +218,7 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <a
               href="#roadmap"
               className="hidden md:inline-flex text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
@@ -194,18 +226,18 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
               Interactive Roadmap
             </a>
             <button
-              onClick={onOpenLogin}
-              className="text-xs font-semibold px-4 py-2 rounded-xl border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
+              onClick={onOpenSignIn}
+              className="text-xs font-semibold px-3.5 py-2 rounded-xl border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer"
             >
               Sign In
             </button>
-            <a
-              href="#connect"
+            <button
+              onClick={onOpenSignUp}
               className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
             >
-              <span>Connect AI</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Get Started</span>
+            </button>
           </div>
         </div>
       </header>
@@ -227,7 +259,7 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
           </h1>
 
           <p className="text-sm sm:text-base lg:text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Connect your free Google Gemini key, upload your resume, and get active Indian tech vacancies scored against your background — complete with custom recruiter pitches and 24/7 mobile sync.
+            Create your secure account, connect your free Google Gemini API key, and get active Indian tech vacancies scored against your background — complete with custom recruiter pitches and 24/7 mobile sync.
           </p>
 
           {/* Quick Metrics */}
@@ -325,7 +357,7 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
                     href="#connect"
                     className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
                   >
-                    <span>Connect & Start This Step</span>
+                    <span>Create Account & Start</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </a>
                   {activeRoadmapStep < roadmapSteps.length - 1 && (
@@ -371,48 +403,102 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
               <Sparkles className="w-6 h-6" />
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-              Connect Your API Keys & Open Workspace
+              Create Your Account & Connect AI
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400">
-              Each user gets a private workspace. Your API key and resume stay completely confidential.
+              Each user gets a private encrypted workspace. Your resume, vacancies, and keys are isolated.
             </p>
           </div>
 
           <form onSubmit={handleQuickLaunch} className="space-y-4 pt-2">
+            {formError && (
+              <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800 text-xs text-rose-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <div className="flex-1">
+                  <span>{formError}</span>
+                  {formError.includes('already exists') && (
+                    <button
+                      type="button"
+                      onClick={onOpenSignIn}
+                      className="ml-2 font-bold text-indigo-400 hover:underline inline"
+                    >
+                      Click here to Sign In ➔
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Your Full Name
+                  Your Full Name <span className="text-rose-400">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Rushabh Dabare"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
-                />
+                <div className="relative">
+                  <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rahul Sharma"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full text-xs sm:text-sm pl-10 pr-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                  Your Email Address (Account ID)
+                  Your Email Address <span className="text-rose-400">*</span>
                 </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="rushabhdabare2001@gmail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
-                />
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full text-xs sm:text-sm pl-10 pr-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
+                  />
+                </div>
               </div>
             </div>
 
+            {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-zinc-300">
-                  Google Gemini API Key
+                  Account Password <span className="text-rose-400">*</span>
+                </label>
+                <span className="text-[11px] text-zinc-500">Min. 6 characters</span>
+              </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  placeholder="Create a secure password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full text-xs sm:text-sm pl-10 pr-10 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Gemini API Key */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-zinc-300">
+                  Google Gemini API Key (Optional)
                 </label>
                 <a
                   href="https://aistudio.google.com/app/apikey"
@@ -424,15 +510,18 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
-              <input
-                type="password"
-                placeholder="AIzaSy... (Connects directly to Gemini 2.5 Flash)"
-                value={geminiApiKey}
-                onChange={(e) => setGeminiApiKey(e.target.value)}
-                className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white font-mono"
-              />
+              <div className="relative">
+                <Key className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="password"
+                  placeholder="AIzaSy... (Can also be added later in settings)"
+                  value={geminiApiKey}
+                  onChange={(e) => setGeminiApiKey(e.target.value)}
+                  className="w-full text-xs sm:text-sm pl-10 pr-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white font-mono"
+                />
+              </div>
               <p className="text-[11px] text-zinc-500 mt-1">
-                Zero billing needed. Google AI Studio gives free tier access for Gemini models.
+                Zero billing needed. Google AI Studio provides a free tier for Gemini models.
               </p>
             </div>
 
@@ -479,8 +568,19 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
                 disabled={submitting}
                 className="w-full py-3.5 bg-linear-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <span>{submitting ? 'Setting Up Your Workspace...' : 'Launch My Job Hunt Copilot 🚀'}</span>
+                <span>{submitting ? 'Creating Account & Workspace...' : 'Create Account & Open Workspace 🚀'}</span>
                 <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-center pt-2">
+              <span className="text-xs text-zinc-500">Already registered? </span>
+              <button
+                type="button"
+                onClick={onOpenSignIn}
+                className="text-xs font-bold text-indigo-400 hover:underline cursor-pointer"
+              >
+                Sign In to your account ➔
               </button>
             </div>
           </form>
@@ -489,7 +589,7 @@ export default function LandingPage({ onEnterApp, onOpenLogin }: LandingPageProp
 
       {/* Footer */}
       <footer className="mt-auto border-t border-zinc-900 py-8 px-4 text-center text-xs text-zinc-500">
-        <p>JobHunt AI — India Tech Edition • Built with Next.js, React 19, Google Gemini & Cloudflare D1</p>
+        <p>JobHunt AI — Production Edition • Multi-User Architecture with Encrypted Authentication</p>
       </footer>
     </div>
   );

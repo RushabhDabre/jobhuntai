@@ -38,9 +38,9 @@ export function getStorageMode(): 'cloudflare-d1' | 'supabase' | 'local' {
 
 const DEFAULT_PROFILE: UserProfile = {
   id: 'default_user',
-  name: 'Rushabh Dabare',
-  email: 'rushabhdabare2001@gmail.com',
-  phone: '9067015129',
+  name: 'Candidate',
+  email: 'candidate@example.com',
+  phone: '+91 9876543210',
   currentLocation: 'Pune, India',
   preferredLocations: ['Pune', 'Mumbai', 'Hyderabad', 'Remote (India)'],
   targetTitles: ['Software Developer', 'Fullstack Developer', 'Frontend Developer', 'React Developer'],
@@ -54,21 +54,18 @@ const DEFAULT_PROFILE: UserProfile = {
     'React',
     'JavaScript',
     'TypeScript',
-    'C#',
     'Java',
     'SQL',
-    'ASP.NET Core Web API',
-    'Spring Boot',
     'Node.js',
     'REST APIs',
     'Git',
   ],
-  resumeText: `RUSHABH DABARE
-Software Developer | Pune, Maharashtra | +91 9067015129 | Notice: Immediate Joiner
+  resumeText: `Candidate Summary
+Software Developer | Pune, Maharashtra | Notice: Immediate Joiner
 
 SUMMARY:
-2+ years of software development experience specializing in web applications using React, JavaScript, C#, Java, and modern REST APIs. Hands-on experience developing frontends, working with relational databases, and debugging production issues.`,
-  hasCompletedQuickSetup: true,
+2+ years of software development experience specializing in web applications using React, JavaScript, Java, and modern REST APIs. Hands-on experience developing frontends, working with relational databases, and debugging production issues.`,
+  hasCompletedQuickSetup: false,
   bioNotes: 'Looking for active vacancies in Pune, Mumbai, or Hyderabad.',
   updatedAt: new Date().toISOString(),
 };
