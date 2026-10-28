@@ -5,9 +5,9 @@ import { parseJobWithAI } from './gemini';
 
 async function getFirecrawlClient(customApiKey?: string): Promise<FirecrawlApp> {
   const settings = await getAppSettings();
-  const apiKey = customApiKey || settings.firecrawlApiKey || process.env.FIRECRAWL_API_KEY;
+  const apiKey = customApiKey?.trim() || settings.firecrawlApiKey?.trim();
   if (!apiKey) {
-    throw new Error('Firecrawl API key is missing. Please add it in Settings or set FIRECRAWL_API_KEY.');
+    throw new Error('Firecrawl API key is not configured. Please add your personal Firecrawl key in Settings (⚙️).');
   }
   return new FirecrawlApp({ apiKey });
 }

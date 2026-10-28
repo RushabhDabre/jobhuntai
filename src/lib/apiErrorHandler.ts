@@ -15,7 +15,50 @@ export function parseApiError(error: unknown, service: 'Gemini' | 'Firecrawl' | 
   const rawMessage = (err?.message || String(error) || '').toLowerCase();
   const status = err?.status || (typeof err?.code === 'number' ? err.code : 0);
 
-  // Check if it's a rate limit or quota exhaustion (429 or RESOURCE_EXHAUSTED)
+  // Check if it's 503 high demand / service unavailable
+  const isHighDemand =
+    status === 503 ||
+    rawMessage.includes('503') ||
+    rawMessage.includes('high demand') ||
+    rawMessage.includes('unavailable') ||
+    rawMessage.includes('spikes in demand');
+
+  if (isHighDemand) {
+    return {
+      isRateLimited: false,
+      isExpired: false,
+      service,
+      title: `${service} High Traffic Spike`,
+      message: `${service} servers are currently experiencing a temporary traffic surge. Retrying with fallback model...`,
+      resetTime: 'Shortly',
+      resetInMinutes: 1,
+      suggestion: 'Spikes usually subside within 15-30 seconds. Click retry shortly.',
+      rawMessage: err?.message || '503 Service Unavailable',
+    };
+  }
+
+  // Check if key is simply missing
+  const isMissingKey =
+    rawMessage.includes('missing') ||
+    rawMessage.includes('not configured') ||
+    rawMessage.includes('please connect your') ||
+    rawMessage.includes('key is required');
+
+  if (isMissingKey) {
+    return {
+      isRateLimited: false,
+      isExpired: false,
+      service,
+      title: `${service} Key Required`,
+      message: err?.message || `Please connect your ${service} key to use this feature.`,
+      resetTime: '',
+      resetInMinutes: 0,
+      suggestion: 'Connect your key in the setup wizard or Settings.',
+      rawMessage: err?.message || 'Key missing',
+    };
+  }
+
+  // Check if it's a true rate limit or quota exhaustion (429 or RESOURCE_EXHAUSTED)
   const isRateLimit =
     status === 429 ||
     rawMessage.includes('resource_exhausted') ||
@@ -38,7 +81,6 @@ export function parseApiError(error: unknown, service: 'Gemini' | 'Firecrawl' | 
     rawMessage.includes('permission_denied') ||
     rawMessage.includes('forbidden');
 
-  // Compute a smart reset time (typically 15 minutes for RPM/TPM bursts or next hour)
   const cooldownMinutes = isRateLimit ? 15 : 60;
   const resetDate = new Date(Date.now() + cooldownMinutes * 60 * 1000);
   const resetTimeStr = resetDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -48,11 +90,11 @@ export function parseApiError(error: unknown, service: 'Gemini' | 'Firecrawl' | 
       isRateLimited: true,
       isExpired: false,
       service,
-      title: `Out of Tokens (${service})`,
-      message: `You've temporarily exhausted your free tier tokens for ${service}. Please wait until ${resetTimeStr} (${cooldownMinutes} mins) for token replenishment.`,
+      title: `Rate Limit Exceeded (${service})`,
+      message: `You've temporarily reached the free tier request limit for ${service}. Limits replenish every minute or after cooldown.`,
       resetTime: resetTimeStr,
       resetInMinutes: cooldownMinutes,
-      suggestion: 'You can wait for the cooldown or enter an alternative API key in Settings.',
+      suggestion: 'Wait a few moments or connect an alternative API key.',
       rawMessage: err?.message || 'Rate limit exceeded',
     };
   }
@@ -62,24 +104,24 @@ export function parseApiError(error: unknown, service: 'Gemini' | 'Firecrawl' | 
       isRateLimited: false,
       isExpired: true,
       service,
-      title: `${service} API Key Expired or Invalid`,
-      message: `Your ${service} API key is expired or unauthorized. Please update it in Settings.`,
-      resetTime: resetTimeStr,
-      resetInMinutes: cooldownMinutes,
-      suggestion: 'Click the Settings (⚙️) icon in the top right to configure a fresh key.',
+      title: `${service} API Key Invalid or Expired`,
+      message: `Your ${service} API key appears invalid or expired. Please check your key at Google AI Studio or Settings.`,
+      resetTime: '',
+      resetInMinutes: 0,
+      suggestion: 'Update your key in Settings or the setup wizard.',
       rawMessage: err?.message || 'Invalid or expired key',
     };
   }
 
-  // Generic error fallback with friendly time estimate
+  // Generic error fallback
   return {
     isRateLimited: false,
     isExpired: false,
     service,
-    title: `${service} Temporary Hiccup`,
-    message: err?.message || 'A temporary service interruption occurred. Please retry shortly.',
-    resetTime: resetTimeStr,
-    resetInMinutes: 5,
+    title: `${service} Notice`,
+    message: err?.message || 'A service interruption occurred. Please retry.',
+    resetTime: '',
+    resetInMinutes: 0,
     suggestion: 'Try again in a few moments.',
     rawMessage: err?.message || String(error),
   };

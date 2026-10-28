@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { getAppSettings, getUserProfile, saveUserProfile } from '@/lib/storage';
 import { resolveAuthUser } from '@/lib/auth-server';
 import { parseApiError } from '@/lib/apiErrorHandler';
-import { normalizeGeminiModel } from '@/lib/services/gemini';
+import { normalizeGeminiModel, generateContentWithRetry } from '@/lib/services/gemini';
 
 export async function POST(req: Request) {
   try {
@@ -101,16 +101,21 @@ Be precise. Calculate yearsOfExperience from first professional role to present.
       },
     ];
 
-    const response = await client.models.generateContent({
-      model,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      contents: promptContents as any,
+    const response = await generateContentWithRetry(client, model, {
+      contents: promptContents,
       config: {
         responseMimeType: 'application/json',
       },
     });
 
-    const parsed = JSON.parse(response.text || '{}');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let parsed: any = {};
+    try {
+      const cleanJson = (response.text || '{}').replace(/```json\n?|\n?```/g, '').trim();
+      parsed = JSON.parse(cleanJson);
+    } catch {
+      parsed = {};
+    }
 
     const updatedProfile = await saveUserProfile(
       {

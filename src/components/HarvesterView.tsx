@@ -133,7 +133,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
         if (data.formattedError) {
           setStatusMessage({
             type: 'error',
-            text: `⚡ Out of tokens for ${data.formattedError.service}. Please wait until ${data.formattedError.resetTime} for quota replenishment.`,
+            text: data.formattedError.message || data.error || 'Apify search failed',
           });
           return;
         }
@@ -182,7 +182,7 @@ export default function HarvesterView({ onJobsImported, openSettings }: Harveste
         if (data.formattedError) {
           setStatusMessage({
             type: 'error',
-            text: `⚡ Out of tokens for ${data.formattedError.service}. Please wait until ${data.formattedError.resetTime} for quota replenishment.`,
+            text: data.formattedError.message || data.error || 'Firecrawl failed',
           });
           return;
         }

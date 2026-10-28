@@ -4,9 +4,9 @@ import { getAppSettings } from '@/lib/storage';
 
 async function getApifyClient(customToken?: string): Promise<ApifyClient> {
   const settings = await getAppSettings();
-  const token = customToken || settings.apifyApiToken || process.env.APIFY_API_TOKEN;
+  const token = customToken?.trim() || settings.apifyApiToken?.trim();
   if (!token) {
-    throw new Error('Apify API token is missing. Please add it in Settings or set APIFY_API_TOKEN.');
+    throw new Error('Apify API token is not configured. Please add your personal Apify token in Settings (⚙️).');
   }
   return new ApifyClient({ token });
 }

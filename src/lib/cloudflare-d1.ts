@@ -322,9 +322,9 @@ export async function d1GetAppSettings(): Promise<AppSettings | null> {
     ? 'gemini-3.8-flash'
     : rawModel;
   return {
-    geminiApiKey: row.gemini_api_key || process.env.GEMINI_API_KEY || '',
-    firecrawlApiKey: row.firecrawl_api_key || process.env.FIRECRAWL_API_KEY || '',
-    apifyApiToken: row.apify_api_token || process.env.APIFY_API_TOKEN || '',
+    geminiApiKey: row.gemini_api_key || '',
+    firecrawlApiKey: row.firecrawl_api_key || '',
+    apifyApiToken: row.apify_api_token || '',
     defaultGeminiModel: normalizedModel,
     targetMarket: row.target_market || 'India',
     updatedAt: row.updated_at || new Date().toISOString(),

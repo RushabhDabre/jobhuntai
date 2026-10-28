@@ -222,6 +222,8 @@ export default function Home() {
     if (roles.length === 0) return;
 
     const primaryRole = roles[0];
+    let totalImported = 0;
+
     const presets = [
       { slug: 'razorpay', platform: 'greenhouse' as const },
       { slug: 'browserstack', platform: 'ashby' as const },
@@ -238,8 +240,31 @@ export default function Home() {
             platform: preset.platform,
             companySlug: preset.slug,
             keywordFilter: primaryRole,
-            limit: 6,
+            limit: 4,
             autoScore: true,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.jobs) && data.jobs.length > 0) {
+          handleJobsImported(data.jobs);
+          totalImported += data.jobs.length;
+        }
+      } catch (e) {
+        console.warn(`Initial harvest error for ${preset.slug}:`, e);
+      }
+    }
+
+    // If niche domain had 0 live results on startup boards (e.g. SAP ERP, QA, Mobile), generate domain-matched openings
+    if (totalImported === 0) {
+      try {
+        const res = await fetch('/api/harvest/quick-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({
+            targetTitles: roles,
+            preferredLocations: preferredLocations || profile?.preferredLocations,
+            preferredTechnologies: profile?.preferredTechnologies,
+            domainCategory: profile?.domainCategory,
           }),
         });
         const data = await res.json();
@@ -247,7 +272,7 @@ export default function Home() {
           handleJobsImported(data.jobs);
         }
       } catch (e) {
-        console.warn(`Initial harvest error for ${preset.slug}:`, e);
+        console.warn('Quick-match fallback failed:', e);
       }
     }
   };

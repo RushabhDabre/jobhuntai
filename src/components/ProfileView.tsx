@@ -135,7 +135,7 @@ export default function ProfileView() {
         if (data.formattedError) {
           setUploadMessage({
             type: 'error',
-            text: `⚡ Out of tokens for ${data.formattedError.service}. Please wait until ${data.formattedError.resetTime} for free tier replenishment, or update your API key in Settings.`,
+            text: data.formattedError.message || data.error || 'Failed to parse resume',
           });
           return;
         }

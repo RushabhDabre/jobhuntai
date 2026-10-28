@@ -79,7 +79,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
       });
       const data = await res.json();
       if (!data.success) {
-        if (data.formattedError) {
+        if (data.formattedError?.isRateLimited) {
           setTokenLimitNotice({
             resetTime: data.formattedError.resetTime,
             message: data.formattedError.message,
@@ -87,7 +87,8 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           });
           return;
         }
-        throw new Error(data.error || 'Evaluation failed');
+        setErrorNotice(data.formattedError?.message || data.error || 'Evaluation failed');
+        return;
       }
       onUpdateJob(data.job);
     } catch (err: unknown) {
@@ -111,7 +112,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
       });
       const data = await res.json();
       if (!data.success) {
-        if (data.formattedError) {
+        if (data.formattedError?.isRateLimited) {
           setTokenLimitNotice({
             resetTime: data.formattedError.resetTime,
             message: data.formattedError.message,
@@ -119,7 +120,8 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           });
           return;
         }
-        throw new Error(data.error || 'Pitch generation failed');
+        setErrorNotice(data.formattedError?.message || data.error || 'Pitch generation failed');
+        return;
       }
       setPitchContent(data.pitch);
       onUpdateJob(data.job);

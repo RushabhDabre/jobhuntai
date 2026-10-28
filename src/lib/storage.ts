@@ -72,9 +72,9 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
-  geminiApiKey: process.env.GEMINI_API_KEY || '',
-  firecrawlApiKey: process.env.FIRECRAWL_API_KEY || '',
-  apifyApiToken: process.env.APIFY_API_TOKEN || '',
+  geminiApiKey: '',
+  firecrawlApiKey: '',
+  apifyApiToken: '',
   defaultGeminiModel: 'gemini-3.8-flash',
   targetMarket: 'India',
   updatedAt: new Date().toISOString(),
@@ -606,9 +606,9 @@ export async function getAppSettings(): Promise<AppSettings> {
           ? 'gemini-3.8-flash'
           : rawModel;
         return {
-          geminiApiKey: data.gemini_api_key || process.env.GEMINI_API_KEY || '',
-          firecrawlApiKey: data.firecrawl_api_key || process.env.FIRECRAWL_API_KEY || '',
-          apifyApiToken: data.apify_api_token || process.env.APIFY_API_TOKEN || '',
+          geminiApiKey: data.gemini_api_key || '',
+          firecrawlApiKey: data.firecrawl_api_key || '',
+          apifyApiToken: data.apify_api_token || '',
           defaultGeminiModel: normalizedModel,
           targetMarket: data.target_market || 'India',
           updatedAt: data.updated_at || new Date().toISOString(),
@@ -635,9 +635,9 @@ export async function getAppSettings(): Promise<AppSettings> {
       ...DEFAULT_SETTINGS,
       ...parsed,
       defaultGeminiModel: normalizedModel,
-      geminiApiKey: parsed.geminiApiKey || process.env.GEMINI_API_KEY || '',
-      firecrawlApiKey: parsed.firecrawlApiKey || process.env.FIRECRAWL_API_KEY || '',
-      apifyApiToken: parsed.apifyApiToken || process.env.APIFY_API_TOKEN || '',
+      geminiApiKey: parsed.geminiApiKey || '',
+      firecrawlApiKey: parsed.firecrawlApiKey || '',
+      apifyApiToken: parsed.apifyApiToken || '',
     };
   } catch {
     return DEFAULT_SETTINGS;

@@ -3,7 +3,7 @@ import { harvestFromAts } from '@/lib/services/ats';
 import { upsertJob, getUserProfile } from '@/lib/storage';
 import { resolveAuthUser } from '@/lib/auth-server';
 import { matchJobWithResume } from '@/lib/services/gemini';
-import { Job } from '@/types/job';
+import { Job, UserProfile } from '@/types/job';
 
 export async function POST(req: Request) {
   try {
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
     const profile = autoScore && userId ? await getUserProfile(userId) : null;
     const savedJobs: Job[] = [];
+    let aiScoredCount = 0;
 
     for (const raw of rawJobs) {
       const newJob: Job = {
@@ -46,21 +47,27 @@ export async function POST(req: Request) {
         updatedAt: now,
       };
 
-      if (profile && newJob.description) {
-        try {
-          const analysis = await matchJobWithResume(
-            {
-              title: newJob.title,
-              company: newJob.company,
-              location: newJob.location,
-              description: newJob.description,
-            },
-            profile
-          );
-          newJob.matchScore = analysis.score;
-          newJob.matchAnalysis = analysis;
-        } catch {
-          // ignore auto-score error for individual items
+      if (profile) {
+        // Deep Gemini match on first job, instant heuristic on remaining to prevent 503/429 rate limit
+        if (aiScoredCount < 1 && newJob.description && profile.geminiApiKey) {
+          try {
+            const analysis = await matchJobWithResume(
+              {
+                title: newJob.title,
+                company: newJob.company,
+                location: newJob.location,
+                description: newJob.description,
+              },
+              profile
+            );
+            newJob.matchScore = analysis.score;
+            newJob.matchAnalysis = analysis;
+            aiScoredCount++;
+          } catch {
+            newJob.matchScore = computeHeuristicScore(newJob, profile);
+          }
+        } else {
+          newJob.matchScore = computeHeuristicScore(newJob, profile);
         }
       }
 
@@ -76,4 +83,22 @@ export async function POST(req: Request) {
     const message = error instanceof Error ? error.message : 'ATS harvesting failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
+}
+
+function computeHeuristicScore(job: Partial<Job>, profile: UserProfile): number {
+  let score = 68;
+  const targetLower: string[] = (profile.targetTitles || []).map((t: string) => t.toLowerCase());
+  const titleLower = (job.title || '').toLowerCase();
+
+  if (targetLower.some((t: string) => titleLower.includes(t) || t.includes(titleLower))) {
+    score += 20;
+  } else if (targetLower.some((t: string) => t.split(/\s+/).some((w: string) => w.length > 3 && titleLower.includes(w)))) {
+    score += 12;
+  }
+
+  const descLower = (job.description || '').toLowerCase();
+  const matchedSkills = (profile.skills || []).filter((s: string) => descLower.includes(s.toLowerCase()));
+  score += Math.min(14, matchedSkills.length * 3);
+
+  return Math.min(96, Math.max(55, score));
 }

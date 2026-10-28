@@ -10,7 +10,7 @@ export interface AtsHarvestParams {
 export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<Job>[]> {
   const { platform, companySlug, keywordFilter, limit = 15 } = params;
   const slug = companySlug.trim().toLowerCase();
-  const filter = (keywordFilter || '').toLowerCase();
+  const filter = (keywordFilter || '').toLowerCase().trim();
 
   if (platform === 'greenhouse') {
     const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true`, {
@@ -30,10 +30,7 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
     }>;
 
     return rawJobs
-      .filter((j) => {
-        if (!filter) return true;
-        return j.title.toLowerCase().includes(filter) || (j.content || '').toLowerCase().includes(filter);
-      })
+      .filter((j) => matchesKeyword(j.title + ' ' + (j.content || ''), filter))
       .slice(0, limit)
       .map((j) => ({
         title: j.title,
@@ -64,10 +61,7 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
     }>;
 
     return rawJobs
-      .filter((j) => {
-        if (!filter) return true;
-        return j.text.toLowerCase().includes(filter) || (j.descriptionPlain || '').toLowerCase().includes(filter);
-      })
+      .filter((j) => matchesKeyword(j.text + ' ' + (j.descriptionPlain || j.description || ''), filter))
       .slice(0, limit)
       .map((j) => ({
         title: j.text,
@@ -100,10 +94,7 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
     }>;
 
     return rawJobs
-      .filter((j) => {
-        if (!filter) return true;
-        return j.title.toLowerCase().includes(filter) || (j.descriptionHtml || '').toLowerCase().includes(filter);
-      })
+      .filter((j) => matchesKeyword(j.title + ' ' + (j.descriptionHtml || ''), filter))
       .slice(0, limit)
       .map((j) => ({
         title: j.title,
@@ -118,6 +109,26 @@ export async function harvestFromAts(params: AtsHarvestParams): Promise<Partial<
   }
 
   throw new Error(`Unsupported ATS platform: ${platform}`);
+}
+
+function matchesKeyword(text: string, filter: string): boolean {
+  if (!filter) return true;
+  const lowerText = text.toLowerCase();
+  const lowerFilter = filter.toLowerCase().trim();
+  if (lowerText.includes(lowerFilter)) return true;
+
+  // Split into significant terms
+  const terms = lowerFilter
+    .split(/[\s,/\\-]+/)
+    .filter((w) => w.length >= 3 && !['and', 'for', 'the', 'with', 'senior', 'lead', 'developer', 'engineer', 'consultant'].includes(w));
+
+  if (terms.length === 0) {
+    // If only generic words like "Engineer" remain, match any of them
+    const genericTerms = lowerFilter.split(/[\s,/\\-]+/).filter((w) => w.length >= 3);
+    return genericTerms.some((t) => lowerText.includes(t));
+  }
+
+  return terms.some((term) => lowerText.includes(term));
 }
 
 function cleanHtml(html: string): string {

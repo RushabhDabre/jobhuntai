@@ -9,6 +9,64 @@ export function normalizeGeminiModel(model?: string): string {
   return model;
 }
 
+/**
+ * Resilient Gemini Content Generator
+ * Handles 503 (high demand) and 429 (rate limits) by:
+ * 1. Backing off and retrying
+ * 2. Cascading to alternative models (e.g. gemini-3.5-flash-lite, gemini-4-argon)
+ */
+export async function generateContentWithRetry(
+  client: GoogleGenAI,
+  preferredModel: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any,
+  maxRetries = 2
+) {
+  const normPreferred = normalizeGeminiModel(preferredModel);
+  // Fallback priority: preferred -> gemini-3.5-flash-lite (high throughput, rarely overloaded) -> gemini-4-argon
+  const candidateModels = [
+    normPreferred,
+    normPreferred !== 'gemini-3.5-flash-lite' ? 'gemini-3.5-flash-lite' : 'gemini-3.8-flash',
+    'gemini-4-argon',
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  let lastError: unknown;
+
+  for (const model of candidateModels) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await client.models.generateContent({
+          ...params,
+          model,
+        });
+        return response;
+      } catch (err: unknown) {
+        lastError = err;
+        const msg = String(err).toLowerCase();
+        const isTransient =
+          msg.includes('503') ||
+          msg.includes('high demand') ||
+          msg.includes('unavailable') ||
+          msg.includes('rate limit') ||
+          msg.includes('resource_exhausted') ||
+          msg.includes('429');
+
+        if (!isTransient) {
+          // If it's an auth error (401/403/invalid key), throw immediately without retrying
+          throw err;
+        }
+
+        // Wait with backoff before retry or trying next model
+        if (attempt < maxRetries) {
+          await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
+        }
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function getGenAIClient(customApiKey?: string) {
   const apiKey = customApiKey?.trim();
   if (!apiKey) {
@@ -71,8 +129,7 @@ Respond strictly in valid JSON matching this schema:
 }`;
 
   try {
-    const response = await client.models.generateContent({
-      model,
+    const response = await generateContentWithRetry(client, model, {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -142,8 +199,7 @@ ${job.description.slice(0, 3000)}
 
 Output ONLY the exact text ready to send.`;
 
-  const response = await client.models.generateContent({
-    model,
+  const response = await generateContentWithRetry(client, model, {
     contents: prompt,
   });
 
@@ -178,8 +234,7 @@ Respond strictly in valid JSON matching this schema:
 }`;
 
   try {
-    const response = await client.models.generateContent({
-      model,
+    const response = await generateContentWithRetry(client, model, {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',

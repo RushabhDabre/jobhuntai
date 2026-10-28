@@ -20,6 +20,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Layers,
 } from 'lucide-react';
 import { UserProfile } from '@/types/job';
 import { getAuthHeaders, getStoredSession } from '@/lib/auth';
@@ -42,6 +43,149 @@ const POPULAR_LOCATIONS = [
   'Remote (India)',
 ];
 
+export const DOMAIN_PRESETS: Record<
+  string,
+  { label: string; roles: string[]; techs: string[] }
+> = {
+  devops: {
+    label: '⚡ DevOps & Cloud',
+    roles: [
+      'DevOps Engineer',
+      'Cloud Infrastructure Engineer',
+      'Site Reliability Engineer (SRE)',
+      'Kubernetes Specialist',
+      'Platform Engineer',
+      'DevOps Lead',
+    ],
+    techs: [
+      'Kubernetes',
+      'Docker',
+      'Terraform',
+      'AWS',
+      'Jenkins',
+      'Ansible',
+      'CI/CD Pipelines',
+      'Linux',
+      'Prometheus',
+      'Helm',
+    ],
+  },
+  sap: {
+    label: '💼 SAP ERP',
+    roles: [
+      'SAP ABAP Consultant',
+      'SAP S/4HANA Developer',
+      'SAP FICO Consultant',
+      'SAP Technical Lead',
+      'SAP MM/SD Consultant',
+      'SAP HANA Architect',
+    ],
+    techs: [
+      'SAP ABAP',
+      'SAP S/4HANA',
+      'SAP Fiori',
+      'SAP HANA',
+      'IDoc',
+      'BAPI',
+      'SAP BTP',
+      'CDS Views',
+      'OData Services',
+      'ALV Reports',
+    ],
+  },
+  fullstack: {
+    label: '💻 Fullstack & Web',
+    roles: [
+      'Full Stack Developer',
+      'Senior React Developer',
+      'Node.js Backend Engineer',
+      'Frontend Engineer',
+      'Java Spring Boot Developer',
+      'Software Engineer',
+    ],
+    techs: [
+      'React',
+      'Node.js',
+      'TypeScript',
+      'Next.js',
+      'Java',
+      'Spring Boot',
+      'PostgreSQL',
+      'Tailwind CSS',
+      'MongoDB',
+      'REST APIs',
+    ],
+  },
+  qa: {
+    label: '🧪 QA & Automation',
+    roles: [
+      'QA Automation Engineer',
+      'SDET (Software Development Engineer in Test)',
+      'Lead QA Engineer',
+      'Performance Tester',
+      'Automation Architect',
+      'Manual QA Engineer',
+    ],
+    techs: [
+      'Selenium',
+      'Playwright',
+      'Cypress',
+      'Java',
+      'Postman',
+      'RestAssured',
+      'JMeter',
+      'TestNG',
+      'Python',
+      'CI/CD Integration',
+    ],
+  },
+  data: {
+    label: '🔬 Data & AI / ML',
+    roles: [
+      'Data Engineer',
+      'Machine Learning Engineer',
+      'Data Scientist',
+      'AI Engineer',
+      'BI Developer / Analyst',
+      'Big Data Engineer',
+    ],
+    techs: [
+      'Python',
+      'SQL',
+      'Apache Spark',
+      'Databricks',
+      'AWS Glue',
+      'Airflow',
+      'TensorFlow',
+      'Power BI',
+      'Pandas',
+      'Snowflake',
+    ],
+  },
+  mobile: {
+    label: '📱 Mobile Apps',
+    roles: [
+      'Mobile App Developer',
+      'Flutter Developer',
+      'React Native Engineer',
+      'Android Developer',
+      'iOS Developer',
+      'Mobile Lead',
+    ],
+    techs: [
+      'Flutter',
+      'React Native',
+      'Kotlin',
+      'Swift',
+      'Android SDK',
+      'iOS SDK',
+      'Dart',
+      'Firebase',
+      'State Management (Bloc/Redux)',
+    ],
+  },
+};
+
 export default function QuickStartModal({
   isOpen,
   onClose,
@@ -57,10 +201,20 @@ export default function QuickStartModal({
   const [showApiKey, setShowApiKey] = useState(false);
   const [isEditingKey, setIsEditingKey] = useState(false);
 
+  // Domain selection state (defaults to DevOps, auto-switches on resume parse or pill click)
+  const [activeDomainKey, setActiveDomainKey] = useState<string>('devops');
+
   // Resume & Preferences State
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
-  const [selectedLocations, setSelectedLocations] = useState<string[]>(['Pune', 'Mumbai', 'Hyderabad', 'Bengaluru', 'Delhi NCR', 'Remote (India)']);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([
+    'Pune',
+    'Mumbai',
+    'Hyderabad',
+    'Bengaluru',
+    'Delhi NCR',
+    'Remote (India)',
+  ]);
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [customTechInput, setCustomTechInput] = useState('');
   const [uploadingResume, setUploadingResume] = useState(false);
@@ -97,6 +251,14 @@ export default function QuickStartModal({
       }
       if (profile.domainCategory) {
         setDetectedDomain(profile.domainCategory);
+        // Map detected domain to preset key if matching
+        const catLower = profile.domainCategory.toLowerCase();
+        if (catLower.includes('sap')) setActiveDomainKey('sap');
+        else if (catLower.includes('devops') || catLower.includes('cloud') || catLower.includes('sre')) setActiveDomainKey('devops');
+        else if (catLower.includes('qa') || catLower.includes('testing')) setActiveDomainKey('qa');
+        else if (catLower.includes('data') || catLower.includes('ai') || catLower.includes('ml')) setActiveDomainKey('data');
+        else if (catLower.includes('mobile')) setActiveDomainKey('mobile');
+        else if (catLower.includes('fullstack') || catLower.includes('web')) setActiveDomainKey('fullstack');
       }
       if (profile.suggestedRoles || profile.suggestedTechnologies) {
         setParsedSuggestions({
@@ -117,54 +279,83 @@ export default function QuickStartModal({
     }
   }, [isOpen]);
 
-  // Derive dynamic list of role suggestions from resume parsing + profile
+  // Derive dynamic list of role suggestions from domain presets + resume parsing + profile
   const availableRoles = useMemo(() => {
     const list: string[] = [];
+
+    // 1. AI parsed suggestions take highest priority
     if (parsedSuggestions.roles.length > 0) {
       list.push(...parsedSuggestions.roles);
     }
+
+    // 2. Profile suggested roles
     if (profile?.suggestedRoles) {
       for (const r of profile.suggestedRoles) {
         if (!list.includes(r)) list.push(r);
       }
     }
+
+    // 3. Current active domain preset roles
+    const domainPreset = DOMAIN_PRESETS[activeDomainKey];
+    if (domainPreset) {
+      for (const r of domainPreset.roles) {
+        if (!list.includes(r)) list.push(r);
+      }
+    }
+
+    // 4. Candidate's already configured target titles
     if (profile?.targetTitles) {
       for (const t of profile.targetTitles) {
         if (!list.includes(t)) list.push(t);
       }
     }
+
+    // 5. Currently selected custom roles
     for (const r of selectedRoles) {
       if (!list.includes(r)) list.push(r);
     }
-    return list;
-  }, [parsedSuggestions.roles, profile, selectedRoles]);
 
-  // Derive dynamic list of tech suggestions from resume parsing + profile
+    return list;
+  }, [parsedSuggestions.roles, profile, activeDomainKey, selectedRoles]);
+
+  // Derive dynamic list of tech suggestions from domain presets + resume parsing + profile
   const availableTechs = useMemo(() => {
     const list: string[] = [];
+
+    // 1. AI parsed technologies
     if (parsedSuggestions.techs.length > 0) {
       list.push(...parsedSuggestions.techs);
     }
+
+    // 2. Profile suggested technologies
     if (profile?.suggestedTechnologies) {
       for (const t of profile.suggestedTechnologies) {
         if (!list.includes(t)) list.push(t);
       }
     }
+
+    // 3. Current active domain preset technologies
+    const domainPreset = DOMAIN_PRESETS[activeDomainKey];
+    if (domainPreset) {
+      for (const t of domainPreset.techs) {
+        if (!list.includes(t)) list.push(t);
+      }
+    }
+
+    // 4. Profile skills
     if (profile?.skills) {
       for (const s of profile.skills.slice(0, 15)) {
         if (!list.includes(s)) list.push(s);
       }
     }
-    if (profile?.preferredTechnologies) {
-      for (const p of profile.preferredTechnologies) {
-        if (!list.includes(p)) list.push(p);
-      }
-    }
+
+    // 5. Currently selected custom techs
     for (const t of selectedTechs) {
       if (!list.includes(t)) list.push(t);
     }
+
     return list;
-  }, [parsedSuggestions.techs, profile, selectedTechs]);
+  }, [parsedSuggestions.techs, profile, activeDomainKey, selectedTechs]);
 
   if (!isOpen) return null;
 
@@ -189,6 +380,20 @@ export default function QuickStartModal({
     if (trimmed && !selectedTechs.includes(trimmed)) {
       setSelectedTechs([...selectedTechs, trimmed]);
       setCustomTechInput('');
+    }
+  };
+
+  const handleDomainSelect = (domainKey: string) => {
+    setActiveDomainKey(domainKey);
+    const preset = DOMAIN_PRESETS[domainKey];
+    if (preset) {
+      // Auto-select first 2 roles from this domain if none selected yet
+      if (selectedRoles.length === 0) {
+        setSelectedRoles(preset.roles.slice(0, 2));
+      }
+      if (selectedTechs.length === 0) {
+        setSelectedTechs(preset.techs.slice(0, 5));
+      }
     }
   };
 
@@ -235,6 +440,13 @@ export default function QuickStartModal({
 
       if (data.domainCategory) {
         setDetectedDomain(data.domainCategory);
+        const catLower = data.domainCategory.toLowerCase();
+        if (catLower.includes('sap')) setActiveDomainKey('sap');
+        else if (catLower.includes('devops') || catLower.includes('cloud') || catLower.includes('sre')) setActiveDomainKey('devops');
+        else if (catLower.includes('qa') || catLower.includes('testing')) setActiveDomainKey('qa');
+        else if (catLower.includes('data') || catLower.includes('ai') || catLower.includes('ml')) setActiveDomainKey('data');
+        else if (catLower.includes('mobile')) setActiveDomainKey('mobile');
+        else if (catLower.includes('fullstack') || catLower.includes('web')) setActiveDomainKey('fullstack');
       }
 
       // Collect returned suggestion arrays
@@ -285,7 +497,12 @@ export default function QuickStartModal({
     e.preventDefault();
     const activeKey = apiKeyInput.trim() || profile?.geminiApiKey;
     if (!activeKey) {
-      setUploadError('Please provide your Google Gemini API key in Step 1 to power your job matches.');
+      setUploadError('Please enter your Google Gemini API key in Step 1 to power your job matches.');
+      return;
+    }
+
+    if (selectedRoles.length === 0) {
+      setUploadError('Please select or add at least one Target Job Role in Step 3.');
       return;
     }
 
@@ -296,6 +513,7 @@ export default function QuickStartModal({
         targetTitles: selectedRoles,
         preferredTechnologies: selectedTechs,
         preferredLocations: selectedLocations,
+        domainCategory: detectedDomain || DOMAIN_PRESETS[activeDomainKey]?.label.replace(/^[^\w]+/, '').trim(),
         hasCompletedQuickSetup: true,
       });
 
@@ -330,7 +548,7 @@ export default function QuickStartModal({
               Setup Your AI Job Matching Engine
             </h2>
             <p className="text-xs text-zinc-500">
-              Connect your free Gemini key, upload your resume, verify extracted keywords, and start discovering live 48-hour vacancies.
+              Connect your free Gemini key, pick your specialization or upload a resume, and discover live 48h vacancies.
             </p>
           </div>
 
@@ -412,7 +630,7 @@ export default function QuickStartModal({
                   </button>
                 </div>
                 <p className="text-[10px] text-zinc-400">
-                  🔒 <strong>Privacy Guarantee:</strong> Your key is stored in your private user profile only and never shared with other users.
+                  🔒 <strong>Privacy Guarantee:</strong> Stored strictly in your personal profile. Never used by or shared with any other account.
                 </p>
               </div>
             )}
@@ -423,7 +641,7 @@ export default function QuickStartModal({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-indigo-500" />
-                <span>2. Upload Resume (Generates Relevant Job Roles & Skills)</span>
+                <span>2. Upload Resume (Auto-detects Domain & Skills)</span>
               </label>
               {detectedDomain && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
@@ -471,12 +689,12 @@ export default function QuickStartModal({
                       ? 'Analyzing resume with Gemini AI...'
                       : resumeUploadedName
                       ? `Active Resume: ${resumeUploadedName}`
-                      : 'Upload Your Resume PDF (DevOps, SAP, Fullstack, QA, Cloud, etc.)'}
+                      : 'Upload Resume PDF / DOCX (Optional: or pick domain presets below)'}
                   </p>
                   <p className="text-[11px] text-zinc-500">
                     {hasResume
                       ? 'Click to upload an updated version or switch files'
-                      : 'AI reads your background and auto-suggests matching roles & tech stack'}
+                      : 'AI automatically extracts your exact domain (SAP, DevOps, QA, etc.) and suggests criteria'}
                   </p>
                 </div>
               </div>
@@ -486,7 +704,7 @@ export default function QuickStartModal({
                   ? 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'
                   : 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
               }`}>
-                {hasResume ? 'Change Resume' : 'Select PDF'}
+                {hasResume ? 'Change File' : 'Select PDF'}
               </span>
             </div>
 
@@ -497,50 +715,72 @@ export default function QuickStartModal({
             )}
           </div>
 
-          {/* STEP 3: Job Role Preferences (Populated dynamically from resume!) */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
-                <Briefcase className="w-4 h-4 text-indigo-500" />
-                <span>3. Target Job Roles {availableRoles.length > 0 ? `(${availableRoles.length} Relevant Suggestions)` : ''}</span>
-              </div>
-              {hasResume && (
+          {/* STEP 3: Domain Presets & Target Job Roles */}
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                  <Briefcase className="w-4 h-4 text-indigo-500" />
+                  <span>3. Target Job Roles</span>
+                </div>
                 <span className="text-[10px] text-zinc-400">Click pills to select / deselect</span>
-              )}
+              </div>
+
+              {/* Quick Domain Switcher */}
+              <div className="p-2.5 rounded-xl bg-zinc-100/70 dark:bg-zinc-800/50 space-y-1.5">
+                <div className="flex items-center gap-1 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Specialization Category:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(DOMAIN_PRESETS).map(([key, item]) => {
+                    const isActive = activeDomainKey === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleDomainSelect(key)}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-indigo-400'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
-            {availableRoles.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {availableRoles.map((role) => {
-                  const isSelected = selectedRoles.includes(role);
-                  return (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => toggleItem(selectedRoles, setSelectedRoles, role)}
-                      className={`text-xs px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer font-medium ${
-                        isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-xs'
-                          : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
-                      }`}
-                    >
-                      {isSelected ? '✓ ' : '+ '}
-                      {role}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-500 text-center">
-                <span>Upload your resume above to get automated job role suggestions tailored specifically to your profession.</span>
-              </div>
-            )}
+            {/* Role Pills */}
+            <div className="flex flex-wrap gap-2">
+              {availableRoles.map((role) => {
+                const isSelected = selectedRoles.includes(role);
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggleItem(selectedRoles, setSelectedRoles, role)}
+                    className={`text-xs px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer font-medium ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-xs'
+                        : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
+                    }`}
+                  >
+                    {isSelected ? '✓ ' : '+ '}
+                    {role}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Custom Role Input */}
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="text"
-                placeholder="Or type a custom role (e.g. SAP ABAP Consultant, DevOps Lead) and press Add"
+                placeholder="Or type custom role (e.g. SAP ABAP Consultant, DevOps Lead) & press Add"
                 value={customRoleInput}
                 onChange={(e) => setCustomRoleInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -562,50 +802,42 @@ export default function QuickStartModal({
             </div>
           </div>
 
-          {/* STEP 4: Technologies & Skills (Populated dynamically from resume!) */}
+          {/* STEP 4: Technologies & Skills */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
                 <Code2 className="w-4 h-4 text-emerald-500" />
-                <span>4. Primary Technologies & Tools {availableTechs.length > 0 ? `(${availableTechs.length} Extracted from Resume)` : ''}</span>
+                <span>4. Primary Technologies & Tools</span>
               </div>
-              {hasResume && (
-                <span className="text-[10px] text-zinc-400">Click pills to select / deselect</span>
-              )}
+              <span className="text-[10px] text-zinc-400">Click pills to select / deselect</span>
             </div>
 
-            {availableTechs.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {availableTechs.map((tech) => {
-                  const isSelected = selectedTechs.includes(tech);
-                  return (
-                    <button
-                      key={tech}
-                      type="button"
-                      onClick={() => toggleItem(selectedTechs, setSelectedTechs, tech)}
-                      className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer font-medium ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs'
-                          : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
-                      }`}
-                    >
-                      {isSelected ? '✓ ' : '+ '}
-                      {tech}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-dashed border-zinc-300 dark:border-zinc-700 text-xs text-zinc-500 text-center">
-                <span>Upload your resume above to extract your exact tech stack, tools, and platforms.</span>
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {availableTechs.map((tech) => {
+                const isSelected = selectedTechs.includes(tech);
+                return (
+                  <button
+                    key={tech}
+                    type="button"
+                    onClick={() => toggleItem(selectedTechs, setSelectedTechs, tech)}
+                    className={`text-xs px-3 py-1.5 rounded-xl border transition-all cursor-pointer font-medium ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white border-emerald-600 font-semibold shadow-xs'
+                        : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400'
+                    }`}
+                  >
+                    {isSelected ? '✓ ' : '+ '}
+                    {tech}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Custom Tech Input */}
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="text"
-                placeholder="Or type a custom technology/skill (e.g. Kubernetes, SAP S/4HANA, Terraform) and press Add"
+                placeholder="Or type custom technology (e.g. Kubernetes, SAP S/4HANA, Terraform) & press Add"
                 value={customTechInput}
                 onChange={(e) => setCustomTechInput(e.target.value)}
                 onKeyDown={(e) => {
