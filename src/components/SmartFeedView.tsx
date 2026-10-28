@@ -788,13 +788,18 @@ export default function SmartFeedView({
                       {job.location}
                     </span>
 
-                    {(job.salaryInLpa || job.salary) && (
+                    {job.salary && job.salary !== 'Not Disclosed' ? (
                       <>
                         <span className="text-zinc-300 dark:text-zinc-700">•</span>
                         <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold">
                           <IndianRupee className="w-3.5 h-3.5" />
-                          {job.salaryInLpa || job.salary}
+                          {job.salary}
                         </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                        <span className="text-zinc-400 text-xs">Salary: Not Disclosed</span>
                       </>
                     )}
 
@@ -862,7 +867,7 @@ export default function SmartFeedView({
                       onClick={() => onSelectJob(job)}
                       className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-colors cursor-pointer"
                     >
-                      <span>Pitch & Details</span>
+                      <span>View Details</span>
                       <ArrowRight className="w-3 h-3" />
                     </button>
 

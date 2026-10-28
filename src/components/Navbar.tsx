@@ -14,13 +14,17 @@ import {
   Clock,
   LogOut,
   LogIn,
+  Globe,
+  FileText,
 } from 'lucide-react';
 import { UserProfile } from '@/types/job';
 import { UserSession } from '@/lib/auth';
 
+export type AppTab = 'feed' | 'scraper' | 'pipeline' | 'profile';
+
 interface NavbarProps {
-  activeTab: 'feed' | 'pipeline' | 'profile';
-  setActiveTab: (tab: 'feed' | 'pipeline' | 'profile') => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   openSettings: () => void;
   openAddJob: () => void;
   profile: UserProfile | null;
@@ -83,7 +87,7 @@ export default function Navbar({
             </button>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links - Exactly 4 Tabs */}
           <nav className="hidden md:flex items-center gap-1 bg-zinc-100/80 dark:bg-zinc-800/60 p-1 rounded-xl text-xs sm:text-sm font-medium">
             <button
               onClick={() => setActiveTab('feed')}
@@ -93,8 +97,20 @@ export default function Navbar({
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
               }`}
             >
-              <Search className="w-4 h-4 text-indigo-500" />
-              <span>Find & Scrape Jobs ({stats.total})</span>
+              <Sparkles className="w-4 h-4 text-indigo-500" />
+              <span>Jobs Feed ({stats.total})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('scraper')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                activeTab === 'scraper'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-emerald-500" />
+              <span>Job Scraper</span>
             </button>
 
             <button
@@ -106,7 +122,7 @@ export default function Navbar({
               }`}
             >
               <Kanban className="w-4 h-4 text-blue-500" />
-              <span>Applications & Tracker ({stats.appliedCount + stats.interviewCount})</span>
+              <span>Applications ({stats.appliedCount + stats.interviewCount})</span>
             </button>
 
             <button
@@ -117,8 +133,8 @@ export default function Navbar({
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
               }`}
             >
-              <User className="w-4 h-4 text-purple-500" />
-              <span>Resume & AI Keys</span>
+              <FileText className="w-4 h-4 text-purple-500" />
+              <span>Resume & Profile</span>
             </button>
           </nav>
 
@@ -173,15 +189,23 @@ export default function Navbar({
         <div className="flex md:hidden items-center justify-around py-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
           <button
             onClick={() => setActiveTab('feed')}
-            className={`py-1 px-3 rounded-lg font-medium ${
+            className={`py-1 px-2.5 rounded-lg font-medium ${
               activeTab === 'feed' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
             }`}
           >
-            Find Jobs
+            Feed
+          </button>
+          <button
+            onClick={() => setActiveTab('scraper')}
+            className={`py-1 px-2.5 rounded-lg font-medium ${
+              activeTab === 'scraper' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
+            }`}
+          >
+            Scraper
           </button>
           <button
             onClick={() => setActiveTab('pipeline')}
-            className={`py-1 px-3 rounded-lg font-medium ${
+            className={`py-1 px-2.5 rounded-lg font-medium ${
               activeTab === 'pipeline' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
             }`}
           >
@@ -189,11 +213,11 @@ export default function Navbar({
           </button>
           <button
             onClick={() => setActiveTab('profile')}
-            className={`py-1 px-3 rounded-lg font-medium ${
+            className={`py-1 px-2.5 rounded-lg font-medium ${
               activeTab === 'profile' ? 'text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60' : 'text-zinc-500'
             }`}
           >
-            Profile & Keys
+            Resume
           </button>
         </div>
       </div>

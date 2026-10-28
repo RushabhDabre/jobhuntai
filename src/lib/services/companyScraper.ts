@@ -14,6 +14,32 @@ export interface CompanyScrapeResult {
   error?: string;
 }
 
+export const KNOWN_COMPANY_PORTALS: Record<
+  string,
+  { company: string; url: string; ats?: { platform: 'greenhouse' | 'lever' | 'ashby'; slug: string } }
+> = {
+  swiggy: { company: 'Swiggy', url: 'https://jobs.lever.co/swiggy', ats: { platform: 'lever', slug: 'swiggy' } },
+  razorpay: { company: 'Razorpay', url: 'https://boards.greenhouse.io/razorpay', ats: { platform: 'greenhouse', slug: 'razorpay' } },
+  cred: { company: 'CRED', url: 'https://boards.greenhouse.io/cred', ats: { platform: 'greenhouse', slug: 'cred' } },
+  browserstack: { company: 'BrowserStack', url: 'https://jobs.ashbyhq.com/browserstack', ats: { platform: 'ashby', slug: 'browserstack' } },
+  zepto: { company: 'Zepto', url: 'https://jobs.lever.co/zepto', ats: { platform: 'lever', slug: 'zepto' } },
+  postman: { company: 'Postman', url: 'https://boards.greenhouse.io/postman', ats: { platform: 'greenhouse', slug: 'postman' } },
+  atlassian: { company: 'Atlassian', url: 'https://boards.greenhouse.io/atlassian', ats: { platform: 'greenhouse', slug: 'atlassian' } },
+  hasura: { company: 'Hasura', url: 'https://jobs.lever.co/hasura', ats: { platform: 'lever', slug: 'hasura' } },
+  wipro: { company: 'Wipro', url: 'https://careers.wipro.com' },
+  tcs: { company: 'TCS', url: 'https://www.tcs.com/careers' },
+  infosys: { company: 'Infosys', url: 'https://www.infosys.com/careers' },
+  zomato: { company: 'Zomato', url: 'https://www.zomato.com/careers' },
+  flipkart: { company: 'Flipkart', url: 'https://www.flipkartcareers.com' },
+  phonepe: { company: 'PhonePe', url: 'https://www.phonepe.com/careers' },
+  accenture: { company: 'Accenture', url: 'https://www.accenture.com/in-en/careers' },
+  cognizant: { company: 'Cognizant', url: 'https://careers.cognizant.com' },
+  capgemini: { company: 'Capgemini', url: 'https://www.capgemini.com/in-en/careers' },
+  microsoft: { company: 'Microsoft', url: 'https://careers.microsoft.com' },
+  amazon: { company: 'Amazon', url: 'https://www.amazon.jobs' },
+  google: { company: 'Google', url: 'https://careers.google.com' },
+};
+
 /**
  * Extracts company name cleanly from URL
  */
@@ -191,11 +217,30 @@ export async function scrapeCompanyCareerUrl(
 ): Promise<CompanyScrapeResult> {
   const trimmed = inputUrl.trim();
   if (!trimmed) {
-    return { success: false, company: '', sourceType: 'none', jobs: [], error: 'URL is required' };
+    return { success: false, company: '', sourceType: 'none', jobs: [], error: 'Company name or URL is required' };
   }
 
-  const fullUrl = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
-  const companyName = extractCompanyNameFromUrl(fullUrl);
+  const lookupKey = trimmed.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const known = KNOWN_COMPANY_PORTALS[lookupKey];
+
+  let fullUrl: string;
+  let companyName: string;
+  let atsInfo: { platform: 'greenhouse' | 'lever' | 'ashby'; slug: string } | null = null;
+
+  if (known) {
+    fullUrl = known.url;
+    companyName = known.company;
+    atsInfo = known.ats || null;
+  } else if (!trimmed.includes('.') && !trimmed.startsWith('http')) {
+    // User entered a plain company name e.g. "Oracle" or "Swiggy"
+    companyName = capitalize(trimmed);
+    fullUrl = `https://careers.${trimmed.toLowerCase()}.com`;
+  } else {
+    // User entered a URL
+    fullUrl = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+    companyName = extractCompanyNameFromUrl(fullUrl);
+    atsInfo = detectAtsFromUrl(fullUrl);
+  }
 
   // Candidate context
   const targetRoles = userProfile?.targetTitles?.length ? userProfile.targetTitles : ['Full Stack Developer', 'Software Engineer'];
@@ -203,7 +248,6 @@ export async function scrapeCompanyCareerUrl(
   const locations = userProfile?.preferredLocations?.length ? userProfile.preferredLocations : ['Pune', 'Bengaluru', 'Mumbai', 'Remote (India)'];
 
   // Step 1: Check known ATS platforms (Greenhouse, Lever, Ashby)
-  const atsInfo = detectAtsFromUrl(fullUrl);
   if (atsInfo) {
     try {
       const harvested = await withTimeout(
@@ -222,11 +266,11 @@ export async function scrapeCompanyCareerUrl(
           return {
             ...j,
             company: companyName,
-            source: atsInfo.platform,
+            source: atsInfo!.platform,
             matchScore: score,
             matchReason: reason,
-            isUrgentHiring: score > 85,
-            noticePeriodAcceptable: 'Immediate to 30 Days',
+            salary: j.salary || 'Not Disclosed',
+            salaryInLpa: j.salaryInLpa,
           };
         });
 
@@ -375,7 +419,7 @@ CRITICAL RULES:
           location: city1,
           remoteType: 'hybrid',
           experienceRequired: '3-6 years',
-          salaryInLpa: '₹18 - ₹28 LPA',
+          salaryInLpa: undefined,
           requirements: [primaryTech, secondaryTech, 'TypeScript', 'REST APIs', 'PostgreSQL'],
           description: `Deliver scalable enterprise software solutions at ${companyName}. Architect microservices and high-performance user interfaces using ${primaryTech} and ${secondaryTech}.`,
           applyUrl: `${fullUrl}?q=${encodeURIComponent(primaryTech)}`,
@@ -386,7 +430,7 @@ CRITICAL RULES:
           location: city2,
           remoteType: 'hybrid',
           experienceRequired: '4-7 years',
-          salaryInLpa: '₹22 - ₹32 LPA',
+          salaryInLpa: undefined,
           requirements: [backendTech, 'Cloud Infrastructure', 'CI/CD Pipelines', 'Docker'],
           description: `Lead backend engineering initiatives at ${companyName}, designing robust distributed architectures, API gateways, and cloud deployment pipelines.`,
           applyUrl: `${fullUrl}?q=${encodeURIComponent(backendTech)}`,
@@ -397,7 +441,7 @@ CRITICAL RULES:
           location: 'Remote (India)',
           remoteType: 'remote',
           experienceRequired: '3-5 years',
-          salaryInLpa: '₹16 - ₹24 LPA',
+          salaryInLpa: undefined,
           requirements: [primaryTech, 'JavaScript / ES6+', 'State Management', 'Tailwind CSS'],
           description: `Build responsive, accessible, customer-facing web applications at ${companyName} with cutting-edge frontend tooling and performance optimization.`,
           applyUrl: `${fullUrl}?q=${encodeURIComponent(primaryTech)}`,
@@ -408,7 +452,7 @@ CRITICAL RULES:
           location: city1,
           remoteType: 'onsite',
           experienceRequired: '3-6 years',
-          salaryInLpa: '₹20 - ₹30 LPA',
+          salaryInLpa: undefined,
           requirements: ['Docker', 'Kubernetes', 'AWS / Azure', 'Terraform', 'CI/CD'],
           description: `Manage containerization, cloud infrastructure, and deployment velocity for ${companyName} high-availability client engagements.`,
           applyUrl: `${fullUrl}?q=DevOps`,
@@ -419,7 +463,7 @@ CRITICAL RULES:
           location: city2,
           remoteType: 'hybrid',
           experienceRequired: '5-8 years',
-          salaryInLpa: '₹24 - ₹36 LPA',
+          salaryInLpa: undefined,
           requirements: [secondaryTech, 'System Design', 'Kafka', 'Redis', 'Unit Testing'],
           description: `Oversee technical design, peer code reviews, and enterprise solution delivery across ${companyName}'s digital transformation teams.`,
           applyUrl: `${fullUrl}?q=Lead`,
@@ -436,16 +480,15 @@ CRITICAL RULES:
         location: j.location || locations[0] || 'India / Remote',
         remoteType: j.remoteType || 'unknown',
         experienceRequired: j.experienceRequired || '3-6 years',
-        salaryInLpa: j.salaryInLpa || '₹18 - ₹28 LPA',
-        salary: j.salaryInLpa || '₹18 - ₹28 LPA',
+        salaryInLpa: j.salaryInLpa || undefined,
+        salary: j.salaryInLpa || 'Not Disclosed',
         description: j.description || `${j.title} at ${companyName}`,
         requirements: j.requirements || skills.slice(0, 4),
         url: j.applyUrl || fullUrl,
         source: 'company-website',
         matchScore: score,
         matchReason: reason,
-        isUrgentHiring: score > 80,
-        noticePeriodAcceptable: 'Immediate to 30 Days',
+        isUrgentHiring: score > 85,
       };
     });
 

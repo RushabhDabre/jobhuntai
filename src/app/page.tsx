@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import Navbar from '@/components/Navbar';
+import Navbar, { AppTab } from '@/components/Navbar';
 import SmartFeedView from '@/components/SmartFeedView';
+import JobScraperView from '@/components/JobScraperView';
 import PipelineBoard from '@/components/PipelineBoard';
-import HarvesterView from '@/components/HarvesterView';
 import ProfileView from '@/components/ProfileView';
 import JobDetailModal from '@/components/JobDetailModal';
 import SettingsModal from '@/components/SettingsModal';
@@ -17,7 +17,7 @@ import { UserSession, getStoredSession, logoutUser, saveSession, checkServerSess
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'feed' | 'pipeline' | 'profile'>('feed');
+  const [activeTab, setActiveTab] = useState<AppTab>('feed');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -343,6 +343,15 @@ export default function Home() {
               />
             )}
 
+            {activeTab === 'scraper' && (
+              <JobScraperView
+                profile={profile}
+                onSelectJob={(job) => setSelectedJob(job)}
+                onJobsImported={handleJobsImported}
+                savedJobIds={new Set(jobs.map((j) => j.id))}
+              />
+            )}
+
             {activeTab === 'pipeline' && (
               <PipelineBoard
                 jobs={jobs}
@@ -353,7 +362,9 @@ export default function Home() {
               />
             )}
 
-            {activeTab === 'profile' && <ProfileView />}
+            {activeTab === 'profile' && (
+              <ProfileView openSettings={() => setIsSettingsOpen(true)} />
+            )}
           </>
         )}
       </main>

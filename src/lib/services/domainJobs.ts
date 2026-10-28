@@ -40,49 +40,49 @@ export async function generateDomainMatchedJobs(
 
   if (isSap) {
     employerTemplates = [
-      { company: 'Accenture India', ctc: '₹18 - ₹26 LPA', exp: '3-6 years', locationIndex: 0, hoursAgo: 4 },
-      { company: 'Deloitte Consulting', ctc: '₹22 - ₹32 LPA', exp: '4-7 years', locationIndex: 1, hoursAgo: 11 },
-      { company: 'SAP Labs India', ctc: '₹28 - ₹40 LPA', exp: '3-8 years', locationIndex: 2, hoursAgo: 18 },
-      { company: 'Capgemini Technology', ctc: '₹16 - ₹24 LPA', exp: '2-5 years', locationIndex: 0, hoursAgo: 26 },
-      { company: 'IBM Global Services', ctc: '₹20 - ₹30 LPA', exp: '4-7 years', locationIndex: 1, hoursAgo: 34 },
+      { company: 'Accenture India', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 0, hoursAgo: 4 },
+      { company: 'Deloitte Consulting', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 1, hoursAgo: 11 },
+      { company: 'SAP Labs India', ctc: 'Not Disclosed', exp: '3-8 years', locationIndex: 2, hoursAgo: 18 },
+      { company: 'Capgemini Technology', ctc: 'Not Disclosed', exp: '2-5 years', locationIndex: 0, hoursAgo: 26 },
+      { company: 'IBM Global Services', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 1, hoursAgo: 34 },
     ];
   } else if (isDevOps) {
     employerTemplates = [
-      { company: 'BrowserStack', ctc: '₹24 - ₹36 LPA', exp: '3-6 years', locationIndex: 0, hoursAgo: 3 },
-      { company: 'Razorpay', ctc: '₹28 - ₹42 LPA', exp: '4-7 years', locationIndex: 1, hoursAgo: 9 },
-      { company: 'Atlassian India', ctc: '₹35 - ₹55 LPA', exp: '4-8 years', locationIndex: 2, hoursAgo: 17 },
-      { company: 'Media.net', ctc: '₹22 - ₹34 LPA', exp: '2-5 years', locationIndex: 0, hoursAgo: 24 },
-      { company: 'Postman', ctc: '₹30 - ₹45 LPA', exp: '3-7 years', locationIndex: 1, hoursAgo: 38 },
+      { company: 'BrowserStack', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 0, hoursAgo: 3 },
+      { company: 'Razorpay', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 1, hoursAgo: 9 },
+      { company: 'Atlassian India', ctc: 'Not Disclosed', exp: '4-8 years', locationIndex: 2, hoursAgo: 17 },
+      { company: 'Media.net', ctc: 'Not Disclosed', exp: '2-5 years', locationIndex: 0, hoursAgo: 24 },
+      { company: 'Postman', ctc: 'Not Disclosed', exp: '3-7 years', locationIndex: 1, hoursAgo: 38 },
     ];
   } else if (isQa) {
     employerTemplates = [
-      { company: 'Thoughtworks', ctc: '₹20 - ₹30 LPA', exp: '3-6 years', locationIndex: 0, hoursAgo: 5 },
-      { company: 'Zepto', ctc: '₹24 - ₹35 LPA', exp: '3-7 years', locationIndex: 1, hoursAgo: 12 },
-      { company: 'BrowserStack', ctc: '₹22 - ₹32 LPA', exp: '2-5 years', locationIndex: 2, hoursAgo: 21 },
-      { company: 'Postman India', ctc: '₹26 - ₹38 LPA', exp: '4-7 years', locationIndex: 0, hoursAgo: 29 },
+      { company: 'Thoughtworks', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 0, hoursAgo: 5 },
+      { company: 'Zepto', ctc: 'Not Disclosed', exp: '3-7 years', locationIndex: 1, hoursAgo: 12 },
+      { company: 'BrowserStack', ctc: 'Not Disclosed', exp: '2-5 years', locationIndex: 2, hoursAgo: 21 },
+      { company: 'Postman India', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 0, hoursAgo: 29 },
     ];
   } else if (isData) {
     employerTemplates = [
-      { company: 'Fractal Analytics', ctc: '₹20 - ₹32 LPA', exp: '3-6 years', locationIndex: 0, hoursAgo: 6 },
-      { company: 'Tiger Analytics', ctc: '₹22 - ₹34 LPA', exp: '3-7 years', locationIndex: 1, hoursAgo: 14 },
-      { company: 'InMobi', ctc: '₹28 - ₹42 LPA', exp: '4-8 years', locationIndex: 2, hoursAgo: 23 },
-      { company: 'Swiggy', ctc: '₹32 - ₹48 LPA', exp: '4-7 years', locationIndex: 0, hoursAgo: 36 },
+      { company: 'Fractal Analytics', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 0, hoursAgo: 6 },
+      { company: 'Tiger Analytics', ctc: 'Not Disclosed', exp: '3-7 years', locationIndex: 1, hoursAgo: 14 },
+      { company: 'InMobi', ctc: 'Not Disclosed', exp: '4-8 years', locationIndex: 2, hoursAgo: 23 },
+      { company: 'Swiggy', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 0, hoursAgo: 36 },
     ];
   } else if (isMobile) {
     employerTemplates = [
-      { company: 'PhonePe', ctc: '₹26 - ₹40 LPA', exp: '3-6 years', locationIndex: 0, hoursAgo: 7 },
-      { company: 'CRED', ctc: '₹32 - ₹50 LPA', exp: '3-7 years', locationIndex: 1, hoursAgo: 15 },
-      { company: 'Swiggy', ctc: '₹28 - ₹42 LPA', exp: '3-6 years', locationIndex: 2, hoursAgo: 27 },
-      { company: 'Dream11', ctc: '₹30 - ₹46 LPA', exp: '4-7 years', locationIndex: 0, hoursAgo: 39 },
+      { company: 'PhonePe', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 0, hoursAgo: 7 },
+      { company: 'CRED', ctc: 'Not Disclosed', exp: '3-7 years', locationIndex: 1, hoursAgo: 15 },
+      { company: 'Swiggy', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 2, hoursAgo: 27 },
+      { company: 'Dream11', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 0, hoursAgo: 39 },
     ];
   } else {
     // Fullstack / General Tech
     employerTemplates = [
-      { company: 'Razorpay', ctc: '₹25 - ₹38 LPA', exp: '3-6 years', locationIndex: 0, hoursAgo: 4 },
-      { company: 'Swiggy', ctc: '₹28 - ₹42 LPA', exp: '4-7 years', locationIndex: 1, hoursAgo: 10 },
-      { company: 'CRED', ctc: '₹30 - ₹48 LPA', exp: '3-7 years', locationIndex: 2, hoursAgo: 19 },
-      { company: 'BrowserStack', ctc: '₹24 - ₹35 LPA', exp: '2-5 years', locationIndex: 0, hoursAgo: 28 },
-      { company: 'Postman', ctc: '₹28 - ₹44 LPA', exp: '3-7 years', locationIndex: 1, hoursAgo: 37 },
+      { company: 'Razorpay', ctc: 'Not Disclosed', exp: '3-6 years', locationIndex: 0, hoursAgo: 4 },
+      { company: 'Swiggy', ctc: 'Not Disclosed', exp: '4-7 years', locationIndex: 1, hoursAgo: 10 },
+      { company: 'CRED', ctc: 'Not Disclosed', exp: '3-7 years', locationIndex: 2, hoursAgo: 19 },
+      { company: 'BrowserStack', ctc: 'Not Disclosed', exp: '2-5 years', locationIndex: 0, hoursAgo: 28 },
+      { company: 'Postman', ctc: 'Not Disclosed', exp: '3-7 years', locationIndex: 1, hoursAgo: 37 },
     ];
   }
 
@@ -128,7 +128,7 @@ export async function generateDomainMatchedJobs(
         ],
         indiaRelevance: {
           locationFit: `Targeted in ${location}`,
-          salaryFit: `Within expected market bracket (${tmpl.ctc})`,
+          salaryFit: tmpl.ctc === 'Not Disclosed' ? 'Compensation as per company standards' : `Market bracket (${tmpl.ctc})`,
           noticePeriodFit: profile.noticePeriod ? `${profile.noticePeriod} fit` : 'Favorable notice period',
         },
         evaluatedAt: now.toISOString(),

@@ -153,10 +153,14 @@ export default function PipelineBoard({
                             <MapPin className="w-2.5 h-2.5" />
                             {job.location}
                           </span>
-                          {(job.salaryInLpa || job.salary) && (
+                          {job.salary && job.salary !== 'Not Disclosed' ? (
                             <span className="inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold">
                               <IndianRupee className="w-2.5 h-2.5" />
-                              {job.salaryInLpa || job.salary}
+                              {job.salary}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-400">
+                              Not Disclosed
                             </span>
                           )}
                         </div>

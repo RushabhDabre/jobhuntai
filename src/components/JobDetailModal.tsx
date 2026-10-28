@@ -31,12 +31,8 @@ interface JobDetailModalProps {
 
 export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [activeTab, setActiveTab] = useState<'match' | 'pitch' | 'description' | 'notes'>('match');
+  const [activeTab, setActiveTab] = useState<'match' | 'description' | 'notes'>('match');
   const [evaluating, setEvaluating] = useState(false);
-  const [generatingPitch, setGeneratingPitch] = useState(false);
-  const [pitchType, setPitchType] = useState<'linkedin_dm' | 'cold_email' | 'cover_letter'>('linkedin_dm');
-  const [pitchContent, setPitchContent] = useState('');
-  const [copied, setCopied] = useState(false);
   const [localNotes, setLocalNotes] = useState('');
   const [localStatus, setLocalStatus] = useState<JobStatus>('discovered');
   const [localAppliedDate, setLocalAppliedDate] = useState('');
@@ -54,7 +50,6 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
       setLocalNotes(job.notes || '');
       setLocalStatus(job.status || 'discovered');
       setLocalAppliedDate(job.appliedDate || '');
-      setPitchContent(job.coldPitch || job.coverLetter || '');
       setErrorNotice(null);
       setTokenLimitNotice(null);
       if (dialog && !dialog.open) {
@@ -99,40 +94,6 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
     }
   };
 
-  // Generate Pitch / Outreach with Gemini
-  const handleGeneratePitch = async () => {
-    setGeneratingPitch(true);
-    setErrorNotice(null);
-    setTokenLimitNotice(null);
-    try {
-      const res = await fetch(`/api/jobs/${job.id}/pitch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ pitchType }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        if (data.formattedError?.isRateLimited) {
-          setTokenLimitNotice({
-            resetTime: data.formattedError.resetTime,
-            message: data.formattedError.message,
-            service: data.formattedError.service,
-          });
-          return;
-        }
-        setErrorNotice(data.formattedError?.message || data.error || 'Pitch generation failed');
-        return;
-      }
-      setPitchContent(data.pitch);
-      onUpdateJob(data.job);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Generation failed';
-      setErrorNotice(msg);
-    } finally {
-      setGeneratingPitch(false);
-    }
-  };
-
   // Save Notes and Status
   const handleSaveNotesAndStatus = async () => {
     try {
@@ -143,8 +104,6 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
           status: localStatus,
           notes: localNotes,
           appliedDate: localAppliedDate || undefined,
-          coldPitch: pitchType === 'linkedin_dm' ? pitchContent : job.coldPitch,
-          coverLetter: pitchType === 'cover_letter' ? pitchContent : job.coverLetter,
         }),
       });
       const data = await res.json();
@@ -154,12 +113,6 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
     } catch (err) {
       console.error('Failed to save job updates:', err);
     }
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(pitchContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const analysis: MatchAnalysis | undefined = job.matchAnalysis;
@@ -196,13 +149,18 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                 <MapPin className="w-4 h-4 text-zinc-400" />
                 <span>{job.location}</span>
               </div>
-              {(job.salaryInLpa || job.salary) && (
+              {job.salary && job.salary !== 'Not Disclosed' ? (
                 <>
                   <span>•</span>
                   <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
                     <IndianRupee className="w-4 h-4" />
-                    <span>{job.salaryInLpa || job.salary}</span>
+                    <span>{job.salary}</span>
                   </div>
+                </>
+              ) : (
+                <>
+                  <span>•</span>
+                  <span className="text-zinc-400 text-xs">Salary: Not Disclosed</span>
                 </>
               )}
             </div>
@@ -290,18 +248,6 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
                 {job.matchScore}%
               </span>
             )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('pitch')}
-            className={`py-3.5 flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-              activeTab === 'pitch'
-                ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-            <span>Recruiter Outreach & Pitches</span>
           </button>
 
           <button
@@ -518,94 +464,7 @@ export default function JobDetailModal({ job, onClose, onUpdateJob }: JobDetailM
             </div>
           )}
 
-          {/* TAB 2: AI RECRUITER OUTREACH & LETTERS */}
-          {activeTab === 'pitch' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl text-xs font-semibold">
-                  <button
-                    onClick={() => setPitchType('linkedin_dm')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      pitchType === 'linkedin_dm'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    LinkedIn Recruiter Note
-                  </button>
-                  <button
-                    onClick={() => setPitchType('cold_email')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      pitchType === 'cold_email'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    Cold Email (Hiring Mgr)
-                  </button>
-                  <button
-                    onClick={() => setPitchType('cover_letter')}
-                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                      pitchType === 'cover_letter'
-                        ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs font-bold'
-                        : 'text-zinc-500 hover:text-zinc-900'
-                    }`}
-                  >
-                    Cover Letter
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleGeneratePitch}
-                    disabled={generatingPitch}
-                    className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    {generatingPitch ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Crafting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Generate with Gemini</span>
-                      </>
-                    )}
-                  </button>
-
-                  {pitchContent && (
-                    <button
-                      onClick={copyToClipboard}
-                      className="flex items-center gap-1.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold px-3 py-2 rounded-xl transition-colors cursor-pointer"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <textarea
-                rows={11}
-                value={pitchContent}
-                onChange={(e) => setPitchContent(e.target.value)}
-                placeholder="Click 'Generate with Gemini' to craft an outreach note tailored to this opening..."
-                className="w-full text-xs sm:text-sm p-4 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-2xl leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-              />
-            </div>
-          )}
-
-          {/* TAB 3: DESCRIPTION */}
+          {/* TAB 2: DESCRIPTION */}
           {activeTab === 'description' && (
             <div className="space-y-4">
               {job.requirements && job.requirements.length > 0 && (

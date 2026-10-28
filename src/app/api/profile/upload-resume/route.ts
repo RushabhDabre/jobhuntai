@@ -134,31 +134,47 @@ export async function POST(req: Request) {
 
     const hasAnyKey = Boolean(geminiKey || groqKey || openRouterKey || openaiKey);
 
-    if (!hasAnyKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Please connect a free AI API key first (Google Gemini at Google AI Studio or Groq Cloud at console.groq.com).',
-          isApiKeyMissing: true,
-          formattedError: {
-            isRateLimited: false,
-            isExpired: false,
-            service: 'AI Service',
-            title: 'AI Engine Key Required',
-            message: 'Connect your free Gemini or Groq key to parse resumes and discover matching criteria.',
-            resetTime: '',
-            resetInMinutes: 0,
-            suggestion: 'Enter your API key in Step 1 of the setup wizard or Settings.',
-            rawMessage: 'API Key missing',
-          },
-        },
-        { status: 400 }
-      );
-    }
-
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const mimeType = file.type || 'application/pdf';
+
+    // If candidate has not configured an AI key yet, extract resume data heuristically without blocking them!
+    if (!hasAnyKey) {
+      const extractedText = buffer.toString('utf-8', 0, 8000).replace(/[^\x20-\x7E\n\r\t]/g, ' ').trim();
+      const parsedData = parseResumeHeuristically(extractedText, file.name);
+
+      const updatedProfile = await saveUserProfile(
+        {
+          name: parsedData.name || authUser?.name || userProfile?.name || 'Candidate',
+          email: parsedData.email || authUser?.email || userProfile?.email || undefined,
+          phone: parsedData.phone || userProfile?.phone || undefined,
+          currentLocation: parsedData.currentLocation || userProfile?.currentLocation || '',
+          yearsOfExperience: parsedData.yearsOfExperience || userProfile?.yearsOfExperience || 0,
+          domainCategory: parsedData.domainCategory,
+          targetTitles: parsedData.targetTitles,
+          suggestedRoles: parsedData.suggestedRoles,
+          preferredTechnologies: parsedData.suggestedTechnologies.slice(0, 6),
+          suggestedTechnologies: parsedData.suggestedTechnologies,
+          skills: parsedData.skills,
+          resumeText: parsedData.cleanResumeMarkdown,
+          resumeFileName: file.name,
+          updatedAt: new Date().toISOString(),
+        },
+        userId
+      );
+
+      return NextResponse.json({
+        success: true,
+        profile: updatedProfile,
+        domainCategory: parsedData.domainCategory,
+        targetTitles: updatedProfile.targetTitles,
+        suggestedRoles: updatedProfile.suggestedRoles,
+        preferredTechnologies: updatedProfile.preferredTechnologies,
+        suggestedTechnologies: updatedProfile.suggestedTechnologies,
+        skills: updatedProfile.skills,
+        message: `Successfully parsed and extracted profile from ${file.name}!`,
+      });
+    }
 
     const systemPrompt = `You are an expert HR Tech recruiter and ATS resume parser for the Indian tech and corporate hiring market (Pune, Mumbai, Hyderabad, Bengaluru, Delhi-NCR, Chennai).
 Analyze this candidate's uploaded resume carefully. Identify their EXACT specialization, profession, and domain:
