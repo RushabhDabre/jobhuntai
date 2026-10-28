@@ -3,6 +3,23 @@ import { getJobs, upsertJob } from '@/lib/storage';
 import { resolveAuthUser } from '@/lib/auth-server';
 import { Job } from '@/types/job';
 
+function isHallucinatedJob(j: Job): boolean {
+  const t = (j.title || '').toLowerCase();
+  const u = (j.url || '').toLowerCase();
+  const d = (j.description || '').toLowerCase();
+
+  return (
+    t.includes('limited jobs') ||
+    t.includes('company jobs') ||
+    t.includes('payment gateway integration') ||
+    t.includes('infrastructure automation') ||
+    u.includes('?q=') ||
+    u.includes('&q=') ||
+    u.includes('/search?q=') ||
+    (t.endsWith(' jobs') && (d.includes('boilerplate') || d.includes('generic career portal')))
+  );
+}
+
 export async function GET(req: Request) {
   try {
     const authUser = await resolveAuthUser(req);
@@ -14,17 +31,7 @@ export async function GET(req: Request) {
     }
 
     const rawJobs = await getJobs(userId);
-    const jobs = rawJobs.filter((j) => {
-      const t = j.title.toLowerCase();
-      if (
-        t.includes('limited jobs') ||
-        t.includes('company jobs') ||
-        (t.endsWith(' jobs') && (j.description.includes('boilerplate') || j.description.includes('generic career portal')))
-      ) {
-        return false;
-      }
-      return true;
-    });
+    const jobs = rawJobs.filter((j) => !isHallucinatedJob(j));
 
     return NextResponse.json({ success: true, jobs });
   } catch (error: unknown) {
@@ -50,6 +57,8 @@ export async function POST(req: Request) {
     if (Array.isArray(body.jobs)) {
       const saved: Job[] = [];
       for (const item of body.jobs) {
+        if (isHallucinatedJob(item)) continue;
+
         const job: Job = {
           id: item.id || `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           userId: userId,
@@ -60,8 +69,8 @@ export async function POST(req: Request) {
           remoteType: item.remoteType || 'unknown',
           roleCategory: item.roleCategory || undefined,
           technologies: item.technologies || [],
-          salary: item.salary,
-          salaryInLpa: item.salaryInLpa || item.salary,
+          salary: item.salary || 'Not Disclosed',
+          salaryInLpa: item.salaryInLpa,
           url: item.url || '',
           source: item.source || 'manual',
           description: item.description || '',
@@ -75,6 +84,7 @@ export async function POST(req: Request) {
           postedAt: item.postedAt || now,
           createdAt: item.createdAt || now,
           updatedAt: now,
+          isUrgentHiring: item.isUrgentHiring || false,
         };
         saved.push(await upsertJob(job, userId));
       }
@@ -82,6 +92,10 @@ export async function POST(req: Request) {
     }
 
     // Single job creation
+    if (isHallucinatedJob(body)) {
+      return NextResponse.json({ success: false, error: 'Invalid job listing format' }, { status: 400 });
+    }
+
     const job: Job = {
       id: body.id || `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       userId: userId,
@@ -92,8 +106,8 @@ export async function POST(req: Request) {
       remoteType: body.remoteType || 'unknown',
       roleCategory: body.roleCategory || undefined,
       technologies: body.technologies || [],
-      salary: body.salary,
-      salaryInLpa: body.salaryInLpa || body.salary,
+      salary: body.salary || 'Not Disclosed',
+      salaryInLpa: body.salaryInLpa,
       url: body.url || '',
       source: body.source || 'manual',
       description: body.description || '',
@@ -107,6 +121,7 @@ export async function POST(req: Request) {
       postedAt: body.postedAt || now,
       createdAt: body.createdAt || now,
       updatedAt: now,
+      isUrgentHiring: body.isUrgentHiring || false,
     };
 
     const saved = await upsertJob(job, userId);

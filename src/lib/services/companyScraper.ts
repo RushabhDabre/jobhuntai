@@ -3,6 +3,7 @@ import { harvestFromAts } from './ats';
 import { executeAiWithFailover } from './aiRouter';
 import { getAppSettings } from '../storage';
 import { withTimeout } from '@/lib/timeout';
+import { searchJobsWithApify } from './apify';
 import FirecrawlApp from '@mendable/firecrawl-js';
 
 export interface CompanyScrapeResult {
@@ -149,7 +150,7 @@ function cleanHtmlForScraping(html: string): string {
  */
 export function calculateSemanticScore(job: Partial<Job>, profile?: UserProfile | null): { score: number; reason: string } {
   if (!profile) {
-    return { score: 85, reason: 'Strong industry role matching standard software engineering criteria.' };
+    return { score: 85, reason: 'Relevant software engineering opening matching industry standards.' };
   }
 
   let score = 55;
@@ -193,13 +194,17 @@ export function calculateSemanticScore(job: Partial<Job>, profile?: UserProfile 
   const locationMatch = candidateLocations.some((loc) => jobLoc.includes(loc.replace(/\(.*\)/, '').trim()));
   if (isRemote || locationMatch) {
     score += 10;
-    reasons.push(`In your preferred location (${job.location})`);
+    reasons.push(`In your preferred location (${job.location || 'Remote'})`);
   }
 
-  // 4. Notice Period & Immediate Joiner Advantage (+8 bonus)
-  if (profile.noticePeriod === 'Immediate Joiner' || profile.noticePeriod === '15 Days') {
+  // 4. Notice Period & Urgent Hiring Bonus ONLY if the job itself explicitly requires urgent hiring
+  const isUrgent = Boolean(
+    job.isUrgentHiring ||
+    jobText.match(/\b(urgent|immediate|urgently|immediate joiner|15 days|serving notice)\b/i)
+  );
+  if (isUrgent && (profile.noticePeriod === 'Immediate Joiner' || profile.noticePeriod === '15 Days')) {
     score += 8;
-    reasons.push('Immediate joiner advantage (< 20 days notice)');
+    reasons.push('Urgent hiring role fits your immediate availability');
   }
 
   const finalScore = Math.min(97, Math.max(65, score));
@@ -271,6 +276,7 @@ export async function scrapeCompanyCareerUrl(
             matchReason: reason,
             salary: j.salary || 'Not Disclosed',
             salaryInLpa: j.salaryInLpa,
+            isUrgentHiring: Boolean(j.description?.match(/\b(urgent|immediate|urgently|15 days)\b/i)),
           };
         });
 
@@ -287,7 +293,7 @@ export async function scrapeCompanyCareerUrl(
     }
   }
 
-  // Step 2: Extract text content using Firecrawl or direct fetch (with strict timeouts)
+  // Step 2: Extract text content using Firecrawl or direct fetch
   let pageContent = '';
   const settings = await getAppSettings();
 
@@ -322,11 +328,11 @@ export async function scrapeCompanyCareerUrl(
         pageContent = cleanHtmlForScraping(html);
       }
     } catch {
-      // Continue to AI job extractor with portal domain context
+      // Continue to AI or platform fallbacks
     }
   }
 
-  // Step 3: AI-Powered Multi-Job Extraction for this company portal
+  // Step 3: AI-Powered Job Extraction from scraped page
   let rawJobs: Array<{
     title?: string;
     company?: string;
@@ -337,50 +343,45 @@ export async function scrapeCompanyCareerUrl(
     requirements?: string[];
     description?: string;
     applyUrl?: string;
+    isUrgentHiring?: boolean;
   }> = [];
 
-  try {
-    const aiPrompt = `You are a Senior Technical Recruiter and Career Web Scraper.
-A candidate is searching for jobs on the official career portal of ${companyName} (${fullUrl}).
-
-CANDIDATE PREFERENCES:
-- Target Roles: ${targetRoles.join(', ')}
-- Technical Skills: ${skills.join(', ')}
-- Preferred Locations in India: ${locations.join(', ')}
-- Notice Period: ${userProfile?.noticePeriod || 'Immediate Joiner (< 20 Days)'}
+  if (pageContent && pageContent.length > 50) {
+    try {
+      const aiPrompt = `You are a Technical Job Data Extractor.
+Extract ONLY ACTUAL, REAL job openings explicitly listed in the following text from ${companyName}'s career page (${fullUrl}).
 
 WEBPAGE SCRAPED CONTENT:
-${pageContent.length > 50 ? pageContent.slice(0, 15000) : `(Dynamic JavaScript/AJAX Career Search Portal for ${companyName})`}
-
-YOUR TASK:
-Extract ALL open positions from ${companyName}'s career portal that are relevant to this candidate's technical skills.
-If this webpage is a portal search page (like Wipro, TCS, Workday, etc.) where vacancies are loaded dynamically via AJAX or if only search filters appear in the raw text, generate the 5 to 8 actual, realistic technical vacancies currently hired by ${companyName} in India (e.g. Pune, Bengaluru, Hyderabad, Mumbai, Remote) that match this candidate's exact technologies (e.g. React, Spring Boot, ASP.NET Core, Java, Cloud, Node.js).
+${pageContent.slice(0, 15000)}
 
 CRITICAL RULES:
-1. Every job MUST be a specific, individual position (e.g., 'Senior Full Stack Developer - React & Spring Boot', 'Lead Software Engineer - ASP.NET Core', 'Cloud DevOps Specialist').
-2. NEVER return a single generic company overview card like '${companyName} Jobs' or '${companyName} Limited Jobs'.
-3. For EACH job, return:
-   - "title": Specific technical role title
+1. Extract ONLY specific job positions that are EXPLICITLY present in the text above.
+2. DO NOT fabricate, invent, or make up vacancies.
+3. DO NOT generate placeholder query links with "?q=". If no specific job URL is found in the text, use "${fullUrl}".
+4. If the webpage contains NO individual job postings (e.g. it is only a search form, error page, or company intro), return an empty JSON array: []
+5. For each real job found in the text, return:
+   - "title": Exact job title from the text
    - "company": "${companyName}"
-   - "location": Specific Indian city (e.g. "Pune", "Bengaluru", "Hyderabad", "Remote (India)")
+   - "location": Location specified in text (or "India")
    - "remoteType": "remote" | "hybrid" | "onsite"
-   - "experienceRequired": e.g. "3-6 years"
-   - "salaryInLpa": realistic CTC range for this role (e.g. "₹18 - ₹28 LPA")
-   - "requirements": array of 4-6 matching technical skills
-   - "description": 2-3 sentences of actual project responsibilities and technical expectations
-   - "applyUrl": direct URL or search query link on ${companyName}'s portal for this role (e.g. "${fullUrl}?q=React")
-4. Return a valid JSON array of 5 to 8 distinct job objects: [ { ... }, { ... } ]`;
+   - "experienceRequired": Experience mentioned in text or undefined
+   - "salaryInLpa": Salary mentioned in text or undefined (NEVER invent salary numbers)
+   - "requirements": Technical skills mentioned for this role
+   - "description": Summary of the role as written in the text
+   - "applyUrl": Real job link or job ID link found in the page
+   - "isUrgentHiring": true ONLY if the text explicitly states "urgent", "immediate joiner", or "15 days". Otherwise false.
 
-    try {
+Return a valid JSON array: [ { ... }, { ... } ]`;
+
       const aiRes = await withTimeout(
         executeAiWithFailover({
           prompt: aiPrompt,
-          systemPrompt: 'You extract multiple specific job listings from company career portals. Always output a clean JSON array of distinct open jobs.',
+          systemPrompt: 'You extract only real job listings from webpage content. If no specific vacancies are listed, you output an empty JSON array []. NEVER fabricate job titles or URLs.',
           responseJson: true,
           profile: userProfile,
         }),
         10000,
-        'AI company job extraction timed out after 10s'
+        'AI job extraction timed out'
       );
 
       const cleanJson = (aiRes.text || '[]').replace(/```json\n?|\n?```/g, '').trim();
@@ -391,104 +392,56 @@ CRITICAL RULES:
         rawJobs = parsed.jobs;
       }
     } catch (aiErr) {
-      console.warn('AI job extraction skipped or timed out, activating guaranteed multi-role generator:', aiErr);
+      console.warn('AI job extraction skipped or encountered an error:', aiErr);
     }
+  }
 
-    // Filter out any accidental generic title placeholders
-    rawJobs = rawJobs.filter(
-      (j) =>
-        j.title &&
-        !j.title.toLowerCase().includes('limited jobs') &&
-        !j.title.toLowerCase().includes('company jobs') &&
-        j.title !== companyName &&
-        j.title !== `${companyName} Jobs`
-    );
+  // Filter out any generic company placeholders
+  rawJobs = rawJobs.filter(
+    (j) =>
+      j.title &&
+      !j.title.toLowerCase().includes('limited jobs') &&
+      !j.title.toLowerCase().includes('company jobs') &&
+      j.title !== companyName &&
+      j.title !== `${companyName} Jobs`
+  );
 
-    // Guaranteed fallback: If fewer than 4 jobs extracted, populate realistic company tech roles
-    if (rawJobs.length < 4) {
-      const city1 = locations[0] || 'Pune';
-      const city2 = locations[1] || 'Bengaluru';
-      const primaryTech = skills[0] || 'React';
-      const secondaryTech = skills[1] || 'Spring Boot';
-      const backendTech = skills[2] || 'ASP.NET Core';
-
-      rawJobs = [
-        {
-          title: `Senior Full Stack Developer - ${primaryTech} & ${secondaryTech}`,
-          company: companyName,
-          location: city1,
-          remoteType: 'hybrid',
-          experienceRequired: '3-6 years',
-          salaryInLpa: undefined,
-          requirements: [primaryTech, secondaryTech, 'TypeScript', 'REST APIs', 'PostgreSQL'],
-          description: `Deliver scalable enterprise software solutions at ${companyName}. Architect microservices and high-performance user interfaces using ${primaryTech} and ${secondaryTech}.`,
-          applyUrl: `${fullUrl}?q=${encodeURIComponent(primaryTech)}`,
-        },
-        {
-          title: `Lead Software Engineer - ${backendTech} & Cloud`,
-          company: companyName,
-          location: city2,
-          remoteType: 'hybrid',
-          experienceRequired: '4-7 years',
-          salaryInLpa: undefined,
-          requirements: [backendTech, 'Cloud Infrastructure', 'CI/CD Pipelines', 'Docker'],
-          description: `Lead backend engineering initiatives at ${companyName}, designing robust distributed architectures, API gateways, and cloud deployment pipelines.`,
-          applyUrl: `${fullUrl}?q=${encodeURIComponent(backendTech)}`,
-        },
-        {
-          title: `Frontend Specialist - ${primaryTech} & Modern Web`,
-          company: companyName,
-          location: 'Remote (India)',
-          remoteType: 'remote',
-          experienceRequired: '3-5 years',
-          salaryInLpa: undefined,
-          requirements: [primaryTech, 'JavaScript / ES6+', 'State Management', 'Tailwind CSS'],
-          description: `Build responsive, accessible, customer-facing web applications at ${companyName} with cutting-edge frontend tooling and performance optimization.`,
-          applyUrl: `${fullUrl}?q=${encodeURIComponent(primaryTech)}`,
-        },
-        {
-          title: `Cloud & DevOps Engineer - Infrastructure Automation`,
-          company: companyName,
-          location: city1,
-          remoteType: 'onsite',
-          experienceRequired: '3-6 years',
-          salaryInLpa: undefined,
-          requirements: ['Docker', 'Kubernetes', 'AWS / Azure', 'Terraform', 'CI/CD'],
-          description: `Manage containerization, cloud infrastructure, and deployment velocity for ${companyName} high-availability client engagements.`,
-          applyUrl: `${fullUrl}?q=DevOps`,
-        },
-        {
-          title: `Module Lead - Microservices & Distributed Architecture`,
-          company: companyName,
-          location: city2,
-          remoteType: 'hybrid',
-          experienceRequired: '5-8 years',
-          salaryInLpa: undefined,
-          requirements: [secondaryTech, 'System Design', 'Kafka', 'Redis', 'Unit Testing'],
-          description: `Oversee technical design, peer code reviews, and enterprise solution delivery across ${companyName}'s digital transformation teams.`,
-          applyUrl: `${fullUrl}?q=Lead`,
-        },
-      ];
-    }
-
-    // Score each job individually against candidate profile
+  // If real jobs were extracted from the portal HTML
+  if (rawJobs.length > 0) {
     const jobs: Partial<Job>[] = rawJobs.map((j) => {
       const { score, reason } = calculateSemanticScore(j, userProfile);
+      const isUrgent = Boolean(
+        j.isUrgentHiring ||
+        (j.description && /\b(urgent|immediate|urgently|15 days)\b/i.test(j.description)) ||
+        (j.title && /\b(urgent|immediate)\b/i.test(j.title))
+      );
+
+      let cleanUrl = j.applyUrl || fullUrl;
+      if (cleanUrl.includes('?q=') || cleanUrl.includes('&q=') || cleanUrl.includes('/search?')) {
+        cleanUrl = fullUrl;
+      } else if (cleanUrl.startsWith('/')) {
+        try {
+          cleanUrl = new URL(cleanUrl, fullUrl).href;
+        } catch {
+          cleanUrl = fullUrl;
+        }
+      }
+
       return {
         title: j.title || 'Software Engineer',
         company: companyName,
         location: j.location || locations[0] || 'India / Remote',
         remoteType: j.remoteType || 'unknown',
-        experienceRequired: j.experienceRequired || '3-6 years',
+        experienceRequired: j.experienceRequired,
         salaryInLpa: j.salaryInLpa || undefined,
         salary: j.salaryInLpa || 'Not Disclosed',
         description: j.description || `${j.title} at ${companyName}`,
         requirements: j.requirements || skills.slice(0, 4),
-        url: j.applyUrl || fullUrl,
+        url: cleanUrl,
         source: 'company-website',
         matchScore: score,
         matchReason: reason,
-        isUrgentHiring: score > 85,
+        isUrgentHiring: isUrgent,
       };
     });
 
@@ -497,16 +450,60 @@ CRITICAL RULES:
       company: companyName,
       sourceType: 'portal-scraper',
       jobs,
-      message: `Scraped ${jobs.length} open positions from ${companyName}'s career portal related to your skills!`,
-    };
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Failed to scrape company website';
-    return {
-      success: false,
-      company: companyName,
-      sourceType: 'error',
-      jobs: [],
-      error: errorMsg,
+      message: `Scraped ${jobs.length} open positions directly from ${companyName}'s career portal!`,
     };
   }
+
+  // Step 4: If portal is JS-rendered/blocked, attempt to find real jobs via Apify (if token available)
+  if (settings.apifyApiToken) {
+    try {
+      const apifyJobs = await withTimeout(
+        searchJobsWithApify(
+          {
+            provider: 'linkedin',
+            queries: [`${companyName} ${targetRoles[0] || 'Software Engineer'}`],
+            location: locations[0] || 'India',
+            maxItems: 8,
+          },
+          settings.apifyApiToken
+        ),
+        10000,
+        'Apify live search timed out'
+      );
+
+      if (apifyJobs && apifyJobs.length > 0) {
+        const jobs: Partial<Job>[] = apifyJobs.map((j) => {
+          const { score, reason } = calculateSemanticScore(j, userProfile);
+          return {
+            ...j,
+            company: companyName,
+            source: 'linkedin-india',
+            matchScore: score,
+            matchReason: reason,
+            salary: j.salary || 'Not Disclosed',
+            isUrgentHiring: Boolean(j.description?.match(/\b(urgent|immediate|urgently|15 days)\b/i)),
+          };
+        });
+
+        return {
+          success: true,
+          company: companyName,
+          sourceType: 'linkedin',
+          jobs,
+          message: `Found ${jobs.length} verified live openings for ${companyName} via LinkedIn Jobs!`,
+        };
+      }
+    } catch (apifyErr) {
+      console.warn('Apify live search failed for ' + companyName, apifyErr);
+    }
+  }
+
+  // Step 5: If no jobs could be scraped, return an honest message instead of fabricating fake data
+  return {
+    success: false,
+    company: companyName,
+    sourceType: 'portal-blocked',
+    jobs: [],
+    error: `Could not extract live vacancies from ${companyName}. The portal (${fullUrl}) uses dynamic JavaScript/anti-bot protection (e.g. Workday, SAP SuccessFactors) which blocks automated web scrapers. You can visit their career portal directly at ${fullUrl} or configure an Apify API key in Settings (⚙️) to query their live LinkedIn postings.`,
+  };
 }

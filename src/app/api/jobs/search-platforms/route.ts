@@ -46,6 +46,11 @@ export async function POST(req: Request) {
 
         for (const raw of apifyResults) {
           const { score, reason } = calculateSemanticScore(raw, profile);
+          const isUrgent = Boolean(
+            (raw.description && /\b(urgent|immediate|urgently|15 days)\b/i.test(raw.description)) ||
+            (raw.title && /\b(urgent|immediate)\b/i.test(raw.title))
+          );
+
           const fullJob: Job = {
             id: `job-apify-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             userId,
@@ -53,15 +58,16 @@ export async function POST(req: Request) {
             company: raw.company || 'Tech Company',
             location: raw.location || location,
             remoteType: raw.remoteType || 'unknown',
-            salary: raw.salary || 'Market Standard',
+            salary: raw.salary || 'Not Disclosed',
+            salaryInLpa: raw.salaryInLpa,
             url: raw.url || '#',
             source: apifyProvider === 'linkedin' ? 'linkedin-india' : (apifyProvider as Job['source']),
             description: raw.description || `${query} role in ${location}`,
             status: 'discovered',
             matchScore: score,
             matchReason: reason,
-            isUrgentHiring: immediateOnly || score > 85,
-            noticePeriodAcceptable: 'Immediate to 30 Days',
+            isUrgentHiring: isUrgent,
+            noticePeriodAcceptable: isUrgent ? 'Immediate to 15 Days' : undefined,
             postedAt: now,
             createdAt: now,
             updatedAt: now,
@@ -88,6 +94,11 @@ export async function POST(req: Request) {
 
           for (const raw of rawAts) {
             const { score, reason } = calculateSemanticScore(raw, profile);
+            const isUrgent = Boolean(
+              (raw.description && /\b(urgent|immediate|urgently|15 days)\b/i.test(raw.description)) ||
+              (raw.title && /\b(urgent|immediate)\b/i.test(raw.title))
+            );
+
             const fullJob: Job = {
               id: `job-ats-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
               userId,
@@ -95,15 +106,16 @@ export async function POST(req: Request) {
               company: raw.company || board.company,
               location: raw.location || location,
               remoteType: raw.remoteType || 'unknown',
-              salary: '₹22 - ₹38 LPA',
+              salary: raw.salary || 'Not Disclosed',
+              salaryInLpa: raw.salaryInLpa,
               url: raw.url || '#',
               source: board.platform,
               description: raw.description || `${raw.title} at ${board.company}`,
               status: 'discovered',
               matchScore: score,
               matchReason: reason,
-              isUrgentHiring: immediateOnly || score > 80,
-              noticePeriodAcceptable: 'Immediate to 30 Days',
+              isUrgentHiring: isUrgent,
+              noticePeriodAcceptable: isUrgent ? 'Immediate to 15 Days' : undefined,
               postedAt: now,
               createdAt: now,
               updatedAt: now,
@@ -118,7 +130,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Fallback: If still under threshold, generate guaranteed fresh 48h domain vacancies
+    // 3. Fallback: If still under threshold, generate domain vacancies
     if (discoveredJobs.length === 0) {
       const generated = await generateDomainMatchedJobs({
         ...profile,
@@ -133,7 +145,7 @@ export async function POST(req: Request) {
 
     // Filter by immediate only if requested
     const returnList = immediateOnly
-      ? discoveredJobs.filter((j) => j.isUrgentHiring || (j.matchScore || 0) > 80)
+      ? discoveredJobs.filter((j) => j.isUrgentHiring)
       : discoveredJobs;
 
     return NextResponse.json({
