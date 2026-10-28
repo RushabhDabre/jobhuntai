@@ -317,11 +317,15 @@ export async function d1GetAppSettings(): Promise<AppSettings | null> {
   if (!rows || rows.length === 0) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const row = rows[0] as any;
+  const rawModel = row.default_gemini_model;
+  const normalizedModel = (!rawModel || rawModel.startsWith('gemini-2.') || rawModel.startsWith('gemini-1.'))
+    ? 'gemini-3.8-flash'
+    : rawModel;
   return {
     geminiApiKey: row.gemini_api_key || process.env.GEMINI_API_KEY || '',
     firecrawlApiKey: row.firecrawl_api_key || process.env.FIRECRAWL_API_KEY || '',
     apifyApiToken: row.apify_api_token || process.env.APIFY_API_TOKEN || '',
-    defaultGeminiModel: row.default_gemini_model || 'gemini-2.5-flash',
+    defaultGeminiModel: normalizedModel,
     targetMarket: row.target_market || 'India',
     updatedAt: row.updated_at || new Date().toISOString(),
   };
@@ -338,11 +342,16 @@ export async function d1SaveAppSettings(settings: AppSettings): Promise<AppSetti
     )
   `;
 
+  const rawModel = settings.defaultGeminiModel;
+  const normalizedModel = (!rawModel || rawModel.startsWith('gemini-2.') || rawModel.startsWith('gemini-1.'))
+    ? 'gemini-3.8-flash'
+    : rawModel;
+
   const params = [
     settings.geminiApiKey || null,
     settings.firecrawlApiKey || null,
     settings.apifyApiToken || null,
-    settings.defaultGeminiModel || 'gemini-2.5-flash',
+    normalizedModel,
     settings.targetMarket || 'India',
     settings.updatedAt || new Date().toISOString(),
   ];

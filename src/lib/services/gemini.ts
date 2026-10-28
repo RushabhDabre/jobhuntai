@@ -2,6 +2,13 @@ import { GoogleGenAI } from '@google/genai';
 import { Job, UserProfile, MatchAnalysis } from '@/types/job';
 import { getAppSettings } from '@/lib/storage';
 
+export function normalizeGeminiModel(model?: string): string {
+  if (!model || model.startsWith('gemini-2.') || model.startsWith('gemini-1.') || model.includes('2.5-flash')) {
+    return 'gemini-3.8-flash';
+  }
+  return model;
+}
+
 async function getGenAIClient(customApiKey?: string) {
   const apiKey = customApiKey?.trim();
   if (!apiKey) {
@@ -10,7 +17,7 @@ async function getGenAIClient(customApiKey?: string) {
   const settings = await getAppSettings();
   return {
     client: new GoogleGenAI({ apiKey }),
-    model: settings.defaultGeminiModel || 'gemini-2.5-flash',
+    model: normalizeGeminiModel(settings.defaultGeminiModel),
   };
 }
 

@@ -28,7 +28,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     geminiApiKey: '',
     firecrawlApiKey: '',
     apifyApiToken: '',
-    defaultGeminiModel: 'gemini-2.5-flash',
+    defaultGeminiModel: 'gemini-3.8-flash',
     updatedAt: '',
   });
   const [storageInfo, setStorageInfo] = useState<{
@@ -238,13 +238,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div className="flex items-center justify-between pt-1">
                 <label className="text-xs text-zinc-500">Gemini Model:</label>
                 <select
-                  value={settings.defaultGeminiModel || 'gemini-2.5-flash'}
+                  value={settings.defaultGeminiModel || 'gemini-3.8-flash'}
                   onChange={(e) => setSettings({ ...settings, defaultGeminiModel: e.target.value })}
                   className="text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1"
                 >
-                  <option value="gemini-2.5-flash">gemini-2.5-flash (Recommended, fast & high accuracy)</option>
-                  <option value="gemini-1.5-pro">gemini-1.5-pro (Deep complex reasoning)</option>
-                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                  <option value="gemini-3.8-flash">gemini-3.8-flash (Recommended, 1M context, high accuracy)</option>
+                  <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ultra-fast & cost-efficient)</option>
+                  <option value="gemini-4-argon">gemini-4-argon (Deep reasoning & complex tasks)</option>
                 </select>
               </div>
             </div>

@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
   gemini_api_key TEXT,
   firecrawl_api_key TEXT,
   apify_api_token TEXT,
-  default_gemini_model TEXT DEFAULT 'gemini-2.5-flash',
+  default_gemini_model TEXT DEFAULT 'gemini-3.8-flash',
   target_market TEXT DEFAULT 'India',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

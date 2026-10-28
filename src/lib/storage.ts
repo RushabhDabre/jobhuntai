@@ -75,7 +75,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   firecrawlApiKey: process.env.FIRECRAWL_API_KEY || '',
   apifyApiToken: process.env.APIFY_API_TOKEN || '',
-  defaultGeminiModel: 'gemini-2.5-flash',
+  defaultGeminiModel: 'gemini-3.8-flash',
   targetMarket: 'India',
   updatedAt: new Date().toISOString(),
 };
@@ -601,11 +601,15 @@ export async function getAppSettings(): Promise<AppSettings> {
         .eq('id', 'global_settings')
         .single();
       if (!error && data) {
+        const rawModel = data.default_gemini_model;
+        const normalizedModel = (!rawModel || rawModel.startsWith('gemini-2.') || rawModel.startsWith('gemini-1.'))
+          ? 'gemini-3.8-flash'
+          : rawModel;
         return {
           geminiApiKey: data.gemini_api_key || process.env.GEMINI_API_KEY || '',
           firecrawlApiKey: data.firecrawl_api_key || process.env.FIRECRAWL_API_KEY || '',
           apifyApiToken: data.apify_api_token || process.env.APIFY_API_TOKEN || '',
-          defaultGeminiModel: data.default_gemini_model || 'gemini-2.5-flash',
+          defaultGeminiModel: normalizedModel,
           targetMarket: data.target_market || 'India',
           updatedAt: data.updated_at || new Date().toISOString(),
         };
@@ -623,9 +627,14 @@ export async function getAppSettings(): Promise<AppSettings> {
   try {
     const raw = fs.readFileSync(SETTINGS_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
+    const rawModel = parsed.defaultGeminiModel;
+    const normalizedModel = (!rawModel || rawModel.startsWith('gemini-2.') || rawModel.startsWith('gemini-1.'))
+      ? 'gemini-3.8-flash'
+      : rawModel;
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      defaultGeminiModel: normalizedModel,
       geminiApiKey: parsed.geminiApiKey || process.env.GEMINI_API_KEY || '',
       firecrawlApiKey: parsed.firecrawlApiKey || process.env.FIRECRAWL_API_KEY || '',
       apifyApiToken: parsed.apifyApiToken || process.env.APIFY_API_TOKEN || '',

@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { getAppSettings, getUserProfile, saveUserProfile } from '@/lib/storage';
 import { resolveAuthUser } from '@/lib/auth-server';
 import { parseApiError } from '@/lib/apiErrorHandler';
+import { normalizeGeminiModel } from '@/lib/services/gemini';
 
 export async function POST(req: Request) {
   try {
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     const client = new GoogleGenAI({ apiKey });
-    const model = settings.defaultGeminiModel || 'gemini-2.5-flash';
+    const model = normalizeGeminiModel(settings.defaultGeminiModel);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
